@@ -294,7 +294,7 @@ macro(nRF5x_setup)
             COMMENT "started JLink commands"
             )
 
-endmacro(nRF5x_setup)
+endmacro()
 
 # adds a target for comiling and flashing an executable
 macro(nRF5x_addExecutable EXECUTABLE_NAME SOURCE_FILES)
@@ -332,7 +332,7 @@ macro(nRF5x_addAppScheduler)
             "${NRF5_SDK_PATH}/components/libraries/scheduler/app_scheduler.c"
             )
 
-endmacro(nRF5x_addAppScheduler)
+endmacro()
 
 # adds app-level FIFO libraries
 macro(nRF5x_addAppFIFO)
@@ -344,14 +344,14 @@ macro(nRF5x_addAppFIFO)
             "${NRF5_SDK_PATH}/components/libraries/fifo/app_fifo.c"
             )
 
-endmacro(nRF5x_addAppFIFO)
+endmacro()
 
 # adds app-level Timer libraries
 macro(nRF5x_addAppTimer)
     list(APPEND SDK_SOURCE_FILES
             "${NRF5_SDK_PATH}/components/libraries/timer/app_timer.c"
             )
-endmacro(nRF5x_addAppTimer)
+endmacro()
 
 # adds app-level UART libraries
 macro(nRF5x_addAppUART)
@@ -363,7 +363,7 @@ macro(nRF5x_addAppUART)
             "${NRF5_SDK_PATH}/components/libraries/uart/app_uart_fifo.c"
             )
 
-endmacro(nRF5x_addAppUART)
+endmacro()
 
 # adds app-level Button library
 macro(nRF5x_addAppButton)
@@ -375,7 +375,7 @@ macro(nRF5x_addAppButton)
             "${NRF5_SDK_PATH}/components/libraries/button/app_button.c"
             )
 
-endmacro(nRF5x_addAppButton)
+endmacro()
 
 # adds BSP (board support package) library
 macro(nRF5x_addBSP WITH_BLE_BTN WITH_ANT_BTN WITH_NFC)
@@ -405,7 +405,7 @@ macro(nRF5x_addBSP WITH_BLE_BTN WITH_ANT_BTN WITH_NFC)
                 )
     endif ()
 
-endmacro(nRF5x_addBSP)
+endmacro()
 
 # adds Bluetooth Low Energy GATT support library
 macro(nRF5x_addBLEGATT)
@@ -417,7 +417,7 @@ macro(nRF5x_addBLEGATT)
             "${NRF5_SDK_PATH}/components/ble/nrf_ble_gatt/nrf_ble_gatt.c"
             )
 
-endmacro(nRF5x_addBLEGATT)
+endmacro()
 
 # adds Bluetooth Low Energy advertising support library
 macro(nRF5x_addBLEAdvertising)
@@ -429,7 +429,7 @@ macro(nRF5x_addBLEAdvertising)
             "${NRF5_SDK_PATH}/components/ble/ble_advertising/ble_advertising.c"
             )
 
-endmacro(nRF5x_addBLEAdvertising)
+endmacro()
 
 # adds Bluetooth Low Energy advertising support library
 macro(nRF5x_addBLEPeerManager)
@@ -453,7 +453,7 @@ macro(nRF5x_addBLEPeerManager)
             "${NRF5_SDK_PATH}/components/ble/peer_manager/security_manager.c"
     )
 
-endmacro(nRF5x_addBLEPeerManager)
+endmacro()
 
 # adds app-level FDS (flash data storage) library
 macro(nRF5x_addAppFDS)
@@ -470,7 +470,7 @@ macro(nRF5x_addAppFDS)
             "${NRF5_SDK_PATH}/components/libraries/fstorage/nrf_fstorage_nvmc.c"
     )
 
-endmacro(nRF5x_addAppFDS)
+endmacro()
 
 # adds NFC library
 # macro(nRF5x_addNFC)
@@ -508,7 +508,7 @@ endmacro(nRF5x_addAppFDS)
 #             "${NRF5_SDK_PATH}/components/nfc"
 #             )
 # 
-# endmacro(nRF5x_addNFC)
+# endmacro()
 
 macro(nRF5x_addBLEService NAME)
     include_directories(
@@ -519,4 +519,4 @@ macro(nRF5x_addBLEService NAME)
             "${NRF5_SDK_PATH}/components/ble/ble_services/${NAME}/${NAME}.c"
             )
 
-endmacro(nRF5x_addBLEService)
+endmacro()
