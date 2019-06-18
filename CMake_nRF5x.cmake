@@ -158,7 +158,6 @@ macro(nRF5x_setup)
             "${NRF5_SDK_PATH}/components/libraries/log"
             "${NRF5_SDK_PATH}/components/libraries/log/src"
             "${NRF5_SDK_PATH}/components/libraries/low_power_pwm"
-            "${NRF5_SDK_PATH}/components/libraries/mem_manager"
             "${NRF5_SDK_PATH}/components/libraries/memobj"
             "${NRF5_SDK_PATH}/components/libraries/mpu"
             "${NRF5_SDK_PATH}/components/libraries/mutex"
@@ -319,6 +318,18 @@ macro(nRF5x_addExecutable EXECUTABLE_NAME SOURCE_FILES)
             COMMAND ${NRFJPROG} --reset -f ${NRF_TARGET}
             COMMENT "flashing ${EXECUTABLE_NAME}.hex"
             )
+
+endmacro()
+
+# adds dynamic memory manager
+macro(nRF5x_addMemManager)
+    include_directories(
+            "${NRF5_SDK_PATH}/components/libraries/mem_manager"
+    )
+
+    list(APPEND SDK_SOURCE_FILES
+            "${NRF5_SDK_PATH}/components/libraries/mem_manager/mem_manager.c"
+    )
 
 endmacro()
 
