@@ -442,8 +442,29 @@ macro(nRF5x_addBLEAdvertising)
 
 endmacro()
 
+# adds app-level FDS (flash data storage) library
+macro(nRF5x_addFDS)
+    if(NOT DEFINED nRF5x_FDS_ADDED)
+        set(nRF5x_FDS_ADDED TRUE)
+        include_directories(
+                "${NRF5_SDK_PATH}/components/libraries/fds"
+                "${NRF5_SDK_PATH}/components/libraries/fstorage"
+                "${NRF5_SDK_PATH}/components/libraries/experimental_section_vars"
+        )
+
+        list(APPEND SDK_SOURCE_FILES
+                "${NRF5_SDK_PATH}/components/libraries/fds/fds.c"
+                "${NRF5_SDK_PATH}/components/libraries/fstorage/nrf_fstorage.c"
+                "${NRF5_SDK_PATH}/components/libraries/fstorage/nrf_fstorage_sd.c"
+                "${NRF5_SDK_PATH}/components/libraries/fstorage/nrf_fstorage_nvmc.c"
+                )
+    endif()
+endmacro()
+
 # adds Bluetooth Low Energy advertising support library
 macro(nRF5x_addBLEPeerManager)
+    nRF5x_addFDS()
+
     include_directories(
             "${NRF5_SDK_PATH}/components/ble/peer_manager"
     )
@@ -466,21 +487,34 @@ macro(nRF5x_addBLEPeerManager)
 
 endmacro()
 
-# adds app-level FDS (flash data storage) library
-macro(nRF5x_addAppFDS)
+# adds aSAADC driver
+macro(nRF5x_addSAADC)
     include_directories(
-            "${NRF5_SDK_PATH}/components/libraries/fds"
-            "${NRF5_SDK_PATH}/components/libraries/fstorage"
-            "${NRF5_SDK_PATH}/components/libraries/experimental_section_vars"
     )
 
     list(APPEND SDK_SOURCE_FILES
-            "${NRF5_SDK_PATH}/components/libraries/fds/fds.c"
-            "${NRF5_SDK_PATH}/components/libraries/fstorage/nrf_fstorage.c"
-            "${NRF5_SDK_PATH}/components/libraries/fstorage/nrf_fstorage_sd.c"
-            "${NRF5_SDK_PATH}/components/libraries/fstorage/nrf_fstorage_nvmc.c"
+            "${NRF5_SDK_PATH}/modules/nrfx/drivers/src/nrfx_saadc.c"
+            )
+endmacro()
+
+# adds PPI driver
+macro(nRF5x_addPPI)
+    include_directories(
     )
 
+    list(APPEND SDK_SOURCE_FILES
+            "${NRF5_SDK_PATH}/modules/nrfx/drivers/src/nrfx_ppi.c"
+            )
+endmacro()
+
+# adds timer driver
+macro(nRF5x_addTimer)
+    include_directories(
+    )
+
+    list(APPEND SDK_SOURCE_FILES
+            "${NRF5_SDK_PATH}/modules/nrfx/drivers/src/nrfx_timer.c"
+            )
 endmacro()
 
 # adds NFC library
