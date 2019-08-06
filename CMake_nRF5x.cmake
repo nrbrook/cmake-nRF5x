@@ -1,279 +1,149 @@
 cmake_minimum_required(VERSION 3.6)
 
 # check if all the necessary tools paths have been provided.
-if (NOT NRF5_SDK_PATH)
-    message(FATAL_ERROR "The path to the nRF5 SDK (NRF5_SDK_PATH) must be set.")
+if (NOT SDK_ROOT)
+    message(FATAL_ERROR "The path to the nRF5 SDK (SDK_ROOT) must be set.")
 endif ()
 
 if (NOT NRFJPROG)
     message(FATAL_ERROR "The path to the nrfjprog utility (NRFJPROG) must be set.")
 endif ()
 
-# convert toolchain path to bin path
-if(DEFINED ARM_NONE_EABI_TOOLCHAIN_PATH)
-    set(ARM_NONE_EABI_TOOLCHAIN_BIN_PATH ${ARM_NONE_EABI_TOOLCHAIN_PATH}/bin)
+if (NOT MERGEHEX)
+    message(FATAL_ERROR "The path to the mergehex utility (MERGEHEX) must be set.")
+endif ()
+
+if(NOT CMAKE_CONFIG_DIR)
+    message(FATAL_ERROR "The path to the CMake config (CMAKE_CONFIG_DIR) must be set.")
 endif()
 
-# check if the nRF target has been set
-if (NRF_TARGET MATCHES "nrf51")
+macro(add_download_target name)
+    if(TARGET download)
+        add_dependencies(download ${name})
+    else()
+        add_custom_target(download DEPENDS ${name})
+    endif()
+endmacro()
 
-elseif (NRF_TARGET MATCHES "nrf52")
+if(NOT EXISTS ${SDK_ROOT}/license.txt)
+    include(ExternalProject)
+    set(nRF5_SDK_VERSION "nRF5_SDK_15.3.0_59ac345" CACHE STRING "nRF5 SDK")
 
-elseif (NOT NRF_TARGET)
-    message(FATAL_ERROR "nRF target must be defined")
-else ()
-    message(FATAL_ERROR "Only nRF51 and rRF52 boards are supported right now")
-endif ()
+    string(REGEX REPLACE "(nRF5)([1]?_SDK_)([0-9]*).*" "\\1\\2v\\3.x.x" SDK_DIR ${nRF5_SDK_VERSION})
+    set(nRF5_SDK_URL "https://developer.nordicsemi.com/nRF5_SDK/${SDK_DIR}/${nRF5_SDK_VERSION}.zip")
+
+    ExternalProject_Add(nRF5_SDK
+            PREFIX "${nRF5_SDK_VERSION}"
+            TMP_DIR "${CMAKE_CURRENT_BINARY_DIR}/${nRF5_SDK_VERSION}"
+            SOURCE_DIR "${SDK_ROOT}/"
+            DOWNLOAD_DIR "${SDK_ROOT}/zip"
+            DOWNLOAD_NAME "${nRF5_SDK_VERSION}.zip"
+            URL ${nRF5_SDK_URL}
+            # No build or configure commands
+            CONFIGURE_COMMAND ""
+            BUILD_COMMAND ""
+            INSTALL_COMMAND ""
+            LOG_DOWNLOAD ON
+            EXCLUDE_FROM_ALL ON)
+    add_download_target(nRF5_SDK)
+endif()
+
+if(NOT EXISTS ${CMAKE_CONFIG_DIR}/Toolchain.cmake)
+    include(ExternalProject)
+    set(nRF5_MESH_SDK_URL "https://www.nordicsemi.com/-/media/Software-and-other-downloads/SDKs/nRF5-SDK-for-Mesh/nrf5SDKforMeshv320src.zip")
+
+    ExternalProject_Add(nRF5_MESH_SDK
+            PREFIX "nRF5_mesh_sdk"
+            TMP_DIR "${CMAKE_CURRENT_BINARY_DIR}/nRF5_mesh_sdk"
+            SOURCE_DIR "${CMAKE_CONFIG_DIR}/../"
+            DOWNLOAD_DIR "${CMAKE_CONFIG_DIR}/../zip"
+            DOWNLOAD_NAME "meshsdk.zip"
+            URL ${nRF5_MESH_SDK_URL}
+            # No build or configure commands
+            CONFIGURE_COMMAND ""
+            BUILD_COMMAND ""
+            INSTALL_COMMAND ""
+            LOG_DOWNLOAD ON
+            EXCLUDE_FROM_ALL ON)
+    add_download_target(nRF5_MESH_SDK)
+endif()
+
+if(TARGET download)
+    message(WARNING "Run the 'download' target to download dependencies")
+    return()
+endif()
 
 # must be set in file (not macro) scope (in macro would point to parent CMake directory)
 set(DIR_OF_nRF5x_CMAKE ${CMAKE_CURRENT_LIST_DIR})
 
-macro(nRF5x_toolchainSetup)
-    include(${DIR_OF_nRF5x_CMAKE}/arm-gcc-toolchain.cmake)
-endmacro()
+if (NOT BUILD_HOST)
+    set(CMAKE_EXECUTABLE_SUFFIX ".elf")
+    set(BUILD_SHARED_LIBS OFF)
+    set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")
+else ()
+    message(STATUS "Building for HOST")
+    include("${CMAKE_CONFIG_DIR}/UnitTest.cmake")
+    include("${CMAKE_CONFIG_DIR}/Coverage.cmake")
+    include("${CMAKE_CONFIG_DIR}/UBSAN.cmake")
+endif ()
+
+# Export compilation commands to .json file (used by clang-complete backends)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+if (NOT BUILD_HOST)
+    include("${CMAKE_CONFIG_DIR}/Nrfjprog.cmake")
+endif ()
 
 macro(nRF5x_setup)
-    if(NOT DEFINED ARM_GCC_TOOLCHAIN)
-        message(FATAL_ERROR "The toolchain must be set up before calling this macro")
+    if(nRF5x_setup_complete)
+        return()
     endif()
-    # fix on macOS: prevent cmake from adding implicit parameters to Xcode
-    set(CMAKE_OSX_SYSROOT "/")
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "")
+    set(nRF5x_setup_complete TRUE)
 
-    # language standard/version settings
-    set(CMAKE_C_STANDARD 99)
-    set(CMAKE_CXX_STANDARD 98)
+    # Needed tools for generating documentation and serial PyACI
+    find_package(PythonInterp)
+    find_package(Doxygen)
+    find_program(DOT_EXECUTABLE "dot" PATHS ENV PATH)
+    find_program(MSCGEN_EXECUTABLE "mscgen" PATHS ENV PATH)
 
-    # CPU specyfic settings
-    if (NRF_TARGET MATCHES "nrf51")
-        # nRF51 (nRF51-DK => PCA10028)
-        if(NOT DEFINED NRF5_LINKER_SCRIPT)
-            set(NRF5_LINKER_SCRIPT "${CMAKE_SOURCE_DIR}/gcc_nrf51.ld")
-        endif()
-        set(CPU_FLAGS "-mcpu=cortex-m0 -mfloat-abi=soft")
-        add_definitions(-DBOARD_PCA10028 -DNRF51 -DNRF51422)
-        add_definitions(-DSOFTDEVICE_PRESENT -DS130 -DNRF_SD_BLE_API_VERSION=2 -DSWI_DISABLE0 -DBLE_STACK_SUPPORT_REQD)
-        include_directories(
-                "${NRF5_SDK_PATH}/components/softdevice/s130/headers"
-                "${NRF5_SDK_PATH}/components/softdevice/s130/headers/nrf51"
-        )
-        list(APPEND SDK_SOURCE_FILES
-                "${NRF5_SDK_PATH}/modules/nrfx/mdk/system_nrf51.c"
-                "${NRF5_SDK_PATH}/modules/nrfx/mdk/gcc_startup_nrf51.S"
-                )
-        set(SOFTDEVICE_PATH "${NRF5_SDK_PATH}/components/softdevice/s130/hex/s130_nrf51_2.0.0_softdevice.hex")
-    elseif (NRF_TARGET MATCHES "nrf52")
-        # nRF52 (nRF52-DK => PCA10040)
+    include("${CMAKE_CONFIG_DIR}/Toolchain.cmake")
+    include("${CMAKE_CONFIG_DIR}/Platform.cmake")
+    include("${CMAKE_CONFIG_DIR}/SoftDevice.cmake")
+    include("${CMAKE_CONFIG_DIR}/FindDependency.cmake")
+    include("${CMAKE_CONFIG_DIR}/FindSDK.cmake")
 
-        if(NOT DEFINED NRF5_LINKER_SCRIPT)
-            set(NRF5_LINKER_SCRIPT "${CMAKE_SOURCE_DIR}/gcc_nrf52.ld")
-        endif()
-        set(CPU_FLAGS "-mcpu=cortex-m4 -mfloat-abi=hard -mfpu=fpv4-sp-d16")
-        add_definitions(-DNRF52 -DNRF52832 -DNRF52832_XXAA -DNRF52_PAN_74 -DNRF52_PAN_64 -DNRF52_PAN_12 -DNRF52_PAN_58 -DNRF52_PAN_54 -DNRF52_PAN_31 -DNRF52_PAN_51 -DNRF52_PAN_36 -DNRF52_PAN_15 -DNRF52_PAN_20 -DNRF52_PAN_55 -DBOARD_PCA10040)
-        add_definitions(-DSOFTDEVICE_PRESENT -DS132 -DSWI_DISABLE0 -DBLE_STACK_SUPPORT_REQD -DNRF_SD_BLE_API_VERSION=6)
-        include_directories(
-                "${NRF5_SDK_PATH}/components/softdevice/s132/headers"
-                "${NRF5_SDK_PATH}/components/softdevice/s132/headers/nrf52"
-        )
-        list(APPEND SDK_SOURCE_FILES
-                "${NRF5_SDK_PATH}/modules/nrfx/mdk/system_nrf52.c"
-                "${NRF5_SDK_PATH}/modules/nrfx/mdk/gcc_startup_nrf52.S"
-                )
-        set(SOFTDEVICE_PATH "${NRF5_SDK_PATH}/components/softdevice/s132/hex/s132_nrf52_6.1.1_softdevice.hex")
-    endif ()
+    include("${CMAKE_CONFIG_DIR}/BuildType.cmake")
+    include("${CMAKE_CONFIG_DIR}/Board.cmake")
+    include("${CMAKE_CONFIG_DIR}/PCLint.cmake")
+    include("${CMAKE_CONFIG_DIR}/GenerateSESProject.cmake")
 
-    set(COMMON_FLAGS "-MP -MD -mthumb -mabi=aapcs -Wall -g3 -ffunction-sections -fdata-sections -fno-strict-aliasing -fno-builtin --short-enums ${CPU_FLAGS}")
+    include("${CMAKE_CONFIG_DIR}/sdk/${nRF5_SDK_VERSION}.cmake")
+    include("${CMAKE_CONFIG_DIR}/platform/${PLATFORM}.cmake")
+    include("${CMAKE_CONFIG_DIR}/softdevice/${SOFTDEVICE}.cmake")
+    include("${CMAKE_CONFIG_DIR}/board/${BOARD}.cmake")
 
-    # compiler/assambler/linker flags
-    set(CMAKE_C_FLAGS "${COMMON_FLAGS}")
-    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -O1")
-    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3")
-    set(CMAKE_CXX_FLAGS "${COMMON_FLAGS}")
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O1")
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
-    set(CMAKE_ASM_FLAGS "-MP -MD -std=c99 -x assembler-with-cpp")
-    set(CMAKE_EXE_LINKER_FLAGS "-mthumb -mabi=aapcs -std=gnu++98 -std=c99 -L ${NRF5_SDK_PATH}/modules/nrfx/mdk -T${NRF5_LINKER_SCRIPT} ${CPU_FLAGS} -Wl,--gc-sections --specs=nano.specs -lc -lnosys -lm")
-    # note: we must override the default cmake linker flags so that CMAKE_C_FLAGS are not added implicitly
-    set(CMAKE_C_LINK_EXECUTABLE "${CMAKE_C_COMPILER} <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES>")
-    set(CMAKE_CXX_LINK_EXECUTABLE "${CMAKE_C_COMPILER} <LINK_FLAGS> <OBJECTS> -lstdc++ -o <TARGET> <LINK_LIBRARIES>")
+    message(STATUS "SDK: ${nRF5_SDK_VERSION}")
+    message(STATUS "Platform: ${PLATFORM}")
+    message(STATUS "Arch: ${${PLATFORM}_ARCH}")
+    message(STATUS "SoftDevice: ${SOFTDEVICE}")
+    message(STATUS "Board: ${BOARD}")
 
-    # basic board definitions and drivers
-    include_directories(
-            "${NRF5_SDK_PATH}/components"
-            "${NRF5_SDK_PATH}/components/boards"
-            "${NRF5_SDK_PATH}/components/softdevice/common"
-            "${NRF5_SDK_PATH}/integration/nrfx"
-            "${NRF5_SDK_PATH}/integration/nrfx/legacy"
-            "${NRF5_SDK_PATH}/modules/nrfx"
-            "${NRF5_SDK_PATH}/modules/nrfx/drivers/include"
-            "${NRF5_SDK_PATH}/modules/nrfx/hal"
-            "${NRF5_SDK_PATH}/modules/nrfx/mdk"
-    )
+    set(ARCH ${${PLATFORM}_ARCH})
 
-    list(APPEND SDK_SOURCE_FILES
-            "${NRF5_SDK_PATH}/components/boards/boards.c"
-            "${NRF5_SDK_PATH}/components/softdevice/common/nrf_sdh.c"
-            "${NRF5_SDK_PATH}/components/softdevice/common/nrf_sdh_soc.c"
-            "${NRF5_SDK_PATH}/integration/nrfx/legacy/nrf_drv_clock.c"
-            "${NRF5_SDK_PATH}/integration/nrfx/legacy/nrf_drv_uart.c"
-            "${NRF5_SDK_PATH}/modules/nrfx/drivers/src/nrfx_clock.c"
-            "${NRF5_SDK_PATH}/modules/nrfx/drivers/src/nrfx_gpiote.c"
-            "${NRF5_SDK_PATH}/modules/nrfx/drivers/src/nrfx_uart.c"
-            "${NRF5_SDK_PATH}/modules/nrfx/drivers/src/nrfx_uarte.c"
-            "${NRF5_SDK_PATH}/modules/nrfx/drivers/src/prs/nrfx_prs.c"
-            "${NRF5_SDK_PATH}/modules/nrfx/soc/nrfx_atomic.c"
-            )
+    enable_language(C ASM)
 
-
-    # toolchain specific
-    include_directories(
-            "${NRF5_SDK_PATH}/components/toolchain/cmsis/include"
-    )
-
-
-    # libraries
-    include_directories(
-            "${NRF5_SDK_PATH}/components/libraries/atomic"
-            "${NRF5_SDK_PATH}/components/libraries/atomic_fifo"
-            "${NRF5_SDK_PATH}/components/libraries/atomic_flags"
-            "${NRF5_SDK_PATH}/components/libraries/balloc"
-            "${NRF5_SDK_PATH}/components/libraries/bootloader/ble_dfu"
-            "${NRF5_SDK_PATH}/components/libraries/cli"
-            "${NRF5_SDK_PATH}/components/libraries/crc16"
-            "${NRF5_SDK_PATH}/components/libraries/crc32"
-            "${NRF5_SDK_PATH}/components/libraries/crypto"
-            "${NRF5_SDK_PATH}/components/libraries/csense"
-            "${NRF5_SDK_PATH}/components/libraries/csense_drv"
-            "${NRF5_SDK_PATH}/components/libraries/delay"
-            "${NRF5_SDK_PATH}/components/libraries/ecc"
-            "${NRF5_SDK_PATH}/components/libraries/experimental_section_vars"
-            "${NRF5_SDK_PATH}/components/libraries/experimental_task_manager"
-            "${NRF5_SDK_PATH}/components/libraries/fds"
-            "${NRF5_SDK_PATH}/components/libraries/fstorage"
-            "${NRF5_SDK_PATH}/components/libraries/gfx"
-            "${NRF5_SDK_PATH}/components/libraries/gpiote"
-            "${NRF5_SDK_PATH}/components/libraries/hardfault"
-            "${NRF5_SDK_PATH}/components/libraries/hci"
-            "${NRF5_SDK_PATH}/components/libraries/led_softblink"
-            "${NRF5_SDK_PATH}/components/libraries/log"
-            "${NRF5_SDK_PATH}/components/libraries/log/src"
-            "${NRF5_SDK_PATH}/components/libraries/low_power_pwm"
-            "${NRF5_SDK_PATH}/components/libraries/memobj"
-            "${NRF5_SDK_PATH}/components/libraries/mpu"
-            "${NRF5_SDK_PATH}/components/libraries/mutex"
-            "${NRF5_SDK_PATH}/components/libraries/pwm"
-            "${NRF5_SDK_PATH}/components/libraries/pwr_mgmt"
-            "${NRF5_SDK_PATH}/components/libraries/queue"
-            "${NRF5_SDK_PATH}/components/libraries/ringbuf"
-            "${NRF5_SDK_PATH}/components/libraries/scheduler"
-            "${NRF5_SDK_PATH}/components/libraries/sdcard"
-            "${NRF5_SDK_PATH}/components/libraries/slip"
-            "${NRF5_SDK_PATH}/components/libraries/sortlist"
-            "${NRF5_SDK_PATH}/components/libraries/spi_mngr"
-            "${NRF5_SDK_PATH}/components/libraries/stack_guard"
-            "${NRF5_SDK_PATH}/components/libraries/strerror"
-            "${NRF5_SDK_PATH}/components/libraries/svc"
-            "${NRF5_SDK_PATH}/components/libraries/timer"
-            "${NRF5_SDK_PATH}/components/libraries/twi_mngr"
-            "${NRF5_SDK_PATH}/components/libraries/twi_sensor"
-            "${NRF5_SDK_PATH}/components/libraries/usbd"
-            "${NRF5_SDK_PATH}/components/libraries/usbd/class/audio"
-            "${NRF5_SDK_PATH}/components/libraries/usbd/class/cdc"
-            "${NRF5_SDK_PATH}/components/libraries/usbd/class/cdc/acm"
-            "${NRF5_SDK_PATH}/components/libraries/usbd/class/hid"
-            "${NRF5_SDK_PATH}/components/libraries/usbd/class/hid/generic"
-            "${NRF5_SDK_PATH}/components/libraries/usbd/class/hid/kbd"
-            "${NRF5_SDK_PATH}/components/libraries/usbd/class/hid/mouse"
-            "${NRF5_SDK_PATH}/components/libraries/usbd/class/msc"
-            "${NRF5_SDK_PATH}/components/libraries/util"
-    )
-
-    list(APPEND SDK_SOURCE_FILES
-            "${NRF5_SDK_PATH}/components/libraries/atomic/nrf_atomic.c"
-            "${NRF5_SDK_PATH}/components/libraries/atomic_fifo/nrf_atfifo.c"
-            "${NRF5_SDK_PATH}/components/libraries/atomic_flags/nrf_atflags.c"
-            "${NRF5_SDK_PATH}/components/libraries/balloc/nrf_balloc.c"
-            "${NRF5_SDK_PATH}/components/libraries/experimental_section_vars/nrf_section_iter.c"
-            "${NRF5_SDK_PATH}/components/libraries/hardfault/hardfault_implementation.c"
-            "${NRF5_SDK_PATH}/components/libraries/util/nrf_assert.c"
-            "${NRF5_SDK_PATH}/components/libraries/util/app_error.c"
-            "${NRF5_SDK_PATH}/components/libraries/util/app_error_weak.c"
-            "${NRF5_SDK_PATH}/components/libraries/util/app_error_handler_gcc.c"
-            "${NRF5_SDK_PATH}/components/libraries/util/app_util_platform.c"
-            "${NRF5_SDK_PATH}/components/libraries/util/sdk_mapped_flags.c"
-            "${NRF5_SDK_PATH}/components/libraries/log/src/nrf_log_backend_flash.c"
-            "${NRF5_SDK_PATH}/components/libraries/log/src/nrf_log_backend_rtt.c"
-            "${NRF5_SDK_PATH}/components/libraries/log/src/nrf_log_backend_serial.c"
-            "${NRF5_SDK_PATH}/components/libraries/log/src/nrf_log_backend_uart.c"
-            "${NRF5_SDK_PATH}/components/libraries/log/src/nrf_log_default_backends.c"
-            "${NRF5_SDK_PATH}/components/libraries/log/src/nrf_log_frontend.c"
-            "${NRF5_SDK_PATH}/components/libraries/log/src/nrf_log_str_formatter.c"
-            "${NRF5_SDK_PATH}/components/libraries/memobj/nrf_memobj.c"
-            "${NRF5_SDK_PATH}/components/libraries/pwr_mgmt/nrf_pwr_mgmt.c"
-            "${NRF5_SDK_PATH}/components/libraries/ringbuf/nrf_ringbuf.c"
-            "${NRF5_SDK_PATH}/components/libraries/strerror/nrf_strerror.c"
-            "${NRF5_SDK_PATH}/components/libraries/uart/retarget.c"
-            )
-
-    # Segger RTT
-    include_directories(
-            "${NRF5_SDK_PATH}/external/segger_rtt/"
-    )
-
-    list(APPEND SDK_SOURCE_FILES
-            "${NRF5_SDK_PATH}/external/segger_rtt/SEGGER_RTT_Syscalls_GCC.c"
-            "${NRF5_SDK_PATH}/external/segger_rtt/SEGGER_RTT.c"
-            "${NRF5_SDK_PATH}/external/segger_rtt/SEGGER_RTT_printf.c"
-            )
-
-
-    # Other external
-    include_directories(
-            "${NRF5_SDK_PATH}/external/fprintf/"
-            "${NRF5_SDK_PATH}/external/utf_converter/"
-    )
-
-    list(APPEND SDK_SOURCE_FILES
-            "${NRF5_SDK_PATH}/external/utf_converter/utf.c"
-            "${NRF5_SDK_PATH}/external/fprintf/nrf_fprintf.c"
-            "${NRF5_SDK_PATH}/external/fprintf/nrf_fprintf_format.c"
-            )
-
-
-    # Common Bluetooth Low Energy files
-    include_directories(
-            "${NRF5_SDK_PATH}/components/ble"
-            "${NRF5_SDK_PATH}/components/ble/common"
-            "${NRF5_SDK_PATH}/components/ble/ble_advertising"
-            "${NRF5_SDK_PATH}/components/ble/ble_dtm"
-            "${NRF5_SDK_PATH}/components/ble/ble_link_ctx_manager"
-            "${NRF5_SDK_PATH}/components/ble/ble_racp"
-            "${NRF5_SDK_PATH}/components/ble/nrf_ble_qwr"
-            "${NRF5_SDK_PATH}/components/ble/peer_manager"
-    )
-
-    list(APPEND SDK_SOURCE_FILES
-            "${NRF5_SDK_PATH}/components/softdevice/common/nrf_sdh_ble.c"
-            "${NRF5_SDK_PATH}/components/ble/common/ble_advdata.c"
-            "${NRF5_SDK_PATH}/components/ble/common/ble_conn_params.c"
-            "${NRF5_SDK_PATH}/components/ble/common/ble_conn_state.c"
-            "${NRF5_SDK_PATH}/components/ble/common/ble_srv_common.c"
-            "${NRF5_SDK_PATH}/components/ble/ble_advertising/ble_advertising.c"
-            "${NRF5_SDK_PATH}/components/ble/ble_link_ctx_manager/ble_link_ctx_manager.c"
-            "${NRF5_SDK_PATH}/components/ble/ble_services/ble_nus/ble_nus.c"
-            "${NRF5_SDK_PATH}/components/ble/nrf_ble_qwr/nrf_ble_qwr.c"
-            )
+    add_compile_options(${${ARCH}_DEFINES})
 
     # adds target for erasing and flashing the board with a softdevice
     add_custom_target(FLASH_SOFTDEVICE ALL
-            COMMAND ${NRFJPROG} --program ${SOFTDEVICE_PATH} -f ${NRF_TARGET} --sectorerase
+            COMMAND ${NRFJPROG} --program ${${SOFTDEVICE}_HEX_FILE} -f nrf52 --sectorerase
             COMMAND sleep 0.5s
-            COMMAND ${NRFJPROG} --reset -f ${NRF_TARGET}
+            COMMAND ${NRFJPROG} --reset -f nrf52
             COMMENT "flashing SoftDevice"
             )
 
     add_custom_target(FLASH_ERASE ALL
-            COMMAND ${NRFJPROG} --eraseall -f ${NRF_TARGET}
+            COMMAND ${NRFJPROG} --eraseall -f nrf52
             COMMENT "erasing flashing"
             )
 
@@ -286,8 +156,8 @@ macro(nRF5x_setup)
     endif()
 
     add_custom_target(START_JLINK ALL
-            COMMAND ${TERMINAL} "${DIR_OF_nRF5x_CMAKE}/runJLinkGDBServer-${NRF_TARGET}"
-            COMMAND ${TERMINAL} "${DIR_OF_nRF5x_CMAKE}/runJLinkExe-${NRF_TARGET}"
+            COMMAND ${TERMINAL} "${DIR_OF_nRF5x_CMAKE}/runJLinkGDBServer"
+            COMMAND ${TERMINAL} "${DIR_OF_nRF5x_CMAKE}/runJLinkExe"
             COMMAND sleep 2s
             COMMAND ${TERMINAL} "${DIR_OF_nRF5x_CMAKE}/runJLinkRTTClient"
             COMMENT "started JLink commands"
@@ -296,272 +166,492 @@ macro(nRF5x_setup)
 endmacro()
 
 # adds a target for comiling and flashing an executable
-macro(nRF5x_addExecutable EXECUTABLE_NAME SOURCE_FILES)
-    # executable
-    add_executable(${EXECUTABLE_NAME} ${SDK_SOURCE_FILES} ${SOURCE_FILES})
-    set_target_properties(${EXECUTABLE_NAME} PROPERTIES SUFFIX ".out")
-    set_target_properties(${EXECUTABLE_NAME} PROPERTIES LINK_FLAGS "-Wl,-Map=${EXECUTABLE_NAME}.map")
+macro(nRF5x_addExecutable EXECUTABLE_NAME SOURCE_FILES INCLUDE_DIRECTORIES)
+    list(REMOVE_DUPLICATES SOURCE_FILES)
+    list(REMOVE_DUPLICATES INCLUDE_DIRECTORIES)
 
-    # additional POST BUILD setps to create the .bin and .hex files
-    add_custom_command(TARGET ${EXECUTABLE_NAME}
-            POST_BUILD
-            COMMAND ${CMAKE_SIZE_UTIL} ${EXECUTABLE_NAME}.out
-            COMMAND ${CMAKE_OBJCOPY} -O binary ${EXECUTABLE_NAME}.out "${EXECUTABLE_NAME}.bin"
-            COMMAND ${CMAKE_OBJCOPY} -O ihex ${EXECUTABLE_NAME}.out "${EXECUTABLE_NAME}.hex"
-            COMMENT "post build steps for ${EXECUTABLE_NAME}")
+    add_executable(${EXECUTABLE_NAME} ${SOURCE_FILES})
 
-    # custom target for flashing the board
-    add_custom_target("FLASH_${EXECUTABLE_NAME}" ALL
-            DEPENDS ${EXECUTABLE_NAME}
-            COMMAND ${NRFJPROG} --program ${EXECUTABLE_NAME}.hex -f ${NRF_TARGET} --sectorerase
-            COMMAND sleep 0.5s
-            COMMAND ${NRFJPROG} --reset -f ${NRF_TARGET}
-            COMMENT "flashing ${EXECUTABLE_NAME}.hex"
+    target_include_directories(${EXECUTABLE_NAME} PUBLIC ${INCLUDE_DIRECTORIES})
+
+    set_target_link_options(${EXECUTABLE_NAME}
+            ${CMAKE_CURRENT_SOURCE_DIR}/linker/${PLATFORM}_${SOFTDEVICE})
+
+    target_compile_definitions(${EXECUTABLE_NAME} PUBLIC
+            ${USER_DEFINITIONS}
+            -DUSE_APP_CONFIG
+            ${${PLATFORM}_DEFINES}
+            ${${SOFTDEVICE}_DEFINES}
+            ${${BOARD}_DEFINES})
+
+    create_hex(${EXECUTABLE_NAME})
+    add_flash_target(${EXECUTABLE_NAME})
+
+#    get_property(target_include_dirs TARGET ${EXECUTABLE_NAME} PROPERTY INCLUDE_DIRECTORIES)
+    add_ses_project(${EXECUTABLE_NAME})
+endmacro()
+
+# adds mutex lib
+macro(nRF5x_addMutex)
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/components/libraries/mutex"
+            )
+
+endmacro()
+
+# adds app error library
+macro(nRF5x_addAppError)
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/components/libraries/util"
+            )
+
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/components/libraries/util/app_error.c"
+            "${SDK_ROOT}/components/libraries/util/app_error_weak.c"
+            )
+
+endmacro()
+
+# adds power management lib
+macro(nRF5x_addPowerMgmt)
+    nRF5x_addMutex()
+
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/components/libraries/pwr_mgmt"
+            )
+
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/components/libraries/pwr_mgmt/nrf_pwr_mgmt.c"
+            )
+
+endmacro()
+
+# adds balloc lib
+macro(nRF5x_addBalloc)
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/components/libraries/balloc"
+            )
+
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/components/libraries/balloc/nrf_balloc.c"
+            )
+
+endmacro()
+
+# adds atomic fifo lib
+macro(nRF5x_addAtomicFIFO)
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/components/libraries/atomic_fifo"
+            )
+
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/components/libraries/atomic_fifo/nrf_atfifo.c"
+            )
+
+endmacro()
+
+# adds atomic flags lib
+macro(nRF5x_addAtomicFlags)
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/components/libraries/atomic_flags"
+            )
+
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/components/libraries/atomic_flags/nrf_atflags.c"
+            )
+
+endmacro()
+
+# adds memobj lib
+macro(nRF5x_addMemobj)
+    nRF5x_addBalloc()
+
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/components/libraries/memobj"
+            )
+
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/components/libraries/memobj/nrf_memobj.c"
             )
 
 endmacro()
 
 # adds dynamic memory manager
 macro(nRF5x_addMemManager)
-    include_directories(
-            "${NRF5_SDK_PATH}/components/libraries/mem_manager"
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/components/libraries/mem_manager"
     )
 
-    list(APPEND SDK_SOURCE_FILES
-            "${NRF5_SDK_PATH}/components/libraries/mem_manager/mem_manager.c"
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/components/libraries/mem_manager/mem_manager.c"
     )
 
 endmacro()
 
-# adds app-level scheduler library
-macro(nRF5x_addAppScheduler)
-    include_directories(
-            "${NRF5_SDK_PATH}/components/libraries/scheduler"
+# adds app-level FDS (flash data storage) library
+macro(nRF5x_addFDS)
+    nRF5x_addAtomicFIFO()
+
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/components/libraries/fds"
+            "${SDK_ROOT}/components/libraries/fstorage"
+            "${SDK_ROOT}/components/libraries/experimental_section_vars"
     )
 
-    list(APPEND SDK_SOURCE_FILES
-            "${NRF5_SDK_PATH}/components/libraries/scheduler/app_scheduler.c"
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/components/libraries/fds/fds.c"
+            "${SDK_ROOT}/components/libraries/fstorage/nrf_fstorage.c"
+            "${SDK_ROOT}/components/libraries/fstorage/nrf_fstorage_sd.c"
+            "${SDK_ROOT}/components/libraries/fstorage/nrf_fstorage_nvmc.c"
+    )
+endmacro()
+
+# adds ring buffer library
+macro(nRF5x_addRingBuf)
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/components/libraries/ringbuf"
+            )
+
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/components/libraries/ringbuf/nrf_ringbuf.c"
+            )
+endmacro()
+
+# adds strerror library
+macro(nRF5x_addStrError)
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/components/libraries/strerror"
+            )
+
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/components/libraries/strerror/nrf_strerror.c"
+            )
+endmacro()
+
+macro(nRF5x_addSeggerRTT)
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/external/segger_rtt"
+            )
+
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/external/segger_rtt/SEGGER_RTT.c"
+            )
+endmacro()
+
+# adds log library
+macro(nRF5x_addLog)
+    nRF5x_addRingBuf()
+
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/external/fprintf"
+            "${SDK_ROOT}/components/libraries/log/include"
+            )
+
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/external/fprintf/nrf_fprintf.c"
+            "${SDK_ROOT}/external/fprintf/nrf_fprintf_format.c"
+            "${SDK_ROOT}/components/libraries/log/src/nrf_log_str_formatter.c"
+            "${SDK_ROOT}/components/libraries/log/src/nrf_log_frontend.c"
+            "${SDK_ROOT}/components/libraries/log/src/nrf_log_default_backends.c"
+            "${SDK_ROOT}/components/libraries/log/src/nrf_log_backend_flash.c"
+            "${SDK_ROOT}/components/libraries/log/src/nrf_log_backend_rtt.c"
+            "${SDK_ROOT}/components/libraries/log/src/nrf_log_backend_serial.c"
+            "${SDK_ROOT}/components/libraries/log/src/nrf_log_backend_uart.c"
+            )
+endmacro()
+
+# adds aSAADC driver
+macro(nRF5x_addSAADC)
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/modules/nrfx/drivers/include"
+            )
+
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/modules/nrfx/drivers/src/nrfx_saadc.c"
+            )
+endmacro()
+
+# adds PPI driver
+macro(nRF5x_addPPI)
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/modules/nrfx/drivers/include"
+            )
+
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/modules/nrfx/drivers/src/nrfx_ppi.c"
+            )
+endmacro()
+
+# adds timer driver
+macro(nRF5x_addTimer)
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/modules/nrfx/drivers/include"
+            )
+
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/modules/nrfx/drivers/src/nrfx_timer.c"
+            )
+endmacro()
+
+# adds gpiote driver
+macro(nRF5x_addGPIOTE)
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/modules/nrfx/drivers/include"
+            )
+
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/modules/nrfx/drivers/src/nrfx_gpiote.c"
+            )
+endmacro()
+
+# adds app-level scheduler library
+macro(nRF5x_addAppScheduler)
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/components/libraries/scheduler"
+    )
+
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/components/libraries/scheduler/app_scheduler.c"
             )
 
 endmacro()
 
 # adds app-level FIFO libraries
 macro(nRF5x_addAppFIFO)
-    include_directories(
-            "${NRF5_SDK_PATH}/components/libraries/fifo"
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/components/libraries/fifo"
     )
 
-    list(APPEND SDK_SOURCE_FILES
-            "${NRF5_SDK_PATH}/components/libraries/fifo/app_fifo.c"
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/components/libraries/fifo/app_fifo.c"
             )
 
 endmacro()
 
 # adds app-level Timer libraries
 macro(nRF5x_addAppTimer)
-    list(APPEND SDK_SOURCE_FILES
-            "${NRF5_SDK_PATH}/components/libraries/timer/app_timer.c"
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/components/libraries/timer/app_timer.c"
             )
 endmacro()
 
 # adds app-level UART libraries
 macro(nRF5x_addAppUART)
-    include_directories(
-            "${NRF5_SDK_PATH}/components/libraries/uart"
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/integration/nrfx/legacy"
+            "${SDK_ROOT}/components/libraries/uart"
     )
 
-    list(APPEND SDK_SOURCE_FILES
-            "${NRF5_SDK_PATH}/components/libraries/uart/app_uart_fifo.c"
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/integration/nrfx/legacy/nrf_drv_uart.c"
+            "${SDK_ROOT}/components/libraries/uart/app_uart_fifo.c"
             )
 
 endmacro()
 
 # adds app-level Button library
 macro(nRF5x_addAppButton)
-    include_directories(
-            "${NRF5_SDK_PATH}/components/libraries/button"
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/components/libraries/button"
     )
 
-    list(APPEND SDK_SOURCE_FILES
-            "${NRF5_SDK_PATH}/components/libraries/button/app_button.c"
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/components/libraries/button/app_button.c"
             )
 
 endmacro()
 
 # adds BSP (board support package) library
 macro(nRF5x_addBSP WITH_BLE_BTN WITH_ANT_BTN WITH_NFC)
-    include_directories(
-            "${NRF5_SDK_PATH}/components/libraries/bsp"
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/components/libraries/bsp"
     )
 
-    list(APPEND SDK_SOURCE_FILES
-            "${NRF5_SDK_PATH}/components/libraries/bsp/bsp.c"
-            )
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/components/libraries/bsp/bsp.c"
+    )
 
     if (${WITH_BLE_BTN})
-        list(APPEND SDK_SOURCE_FILES
-                "${NRF5_SDK_PATH}/components/libraries/bsp/bsp_btn_ble.c"
-                )
+        list(APPEND SOURCE_FILES
+                "${SDK_ROOT}/components/libraries/bsp/bsp_btn_ble.c"
+        )
     endif ()
 
     if (${WITH_ANT_BTN})
-        list(APPEND SDK_SOURCE_FILES
-                "${NRF5_SDK_PATH}/components/libraries/bsp/bsp_btn_ant.c"
-                )
+        list(APPEND SOURCE_FILES
+                "${SDK_ROOT}/components/libraries/bsp/bsp_btn_ant.c"
+        )
     endif ()
 
     if (${WITH_NFC})
-        list(APPEND SDK_SOURCE_FILES
-                "${NRF5_SDK_PATH}/components/libraries/bsp/bsp_nfc.c"
-                )
+        list(APPEND SOURCE_FILES
+                "${SDK_ROOT}/components/libraries/bsp/bsp_nfc.c"
+        )
     endif ()
 
+endmacro()
+
+macro(nRF5x_addSoftDeviceSupport)
+    nRF5x_addMemobj()
+    nRF5x_addStrError()
+    nRF5x_addAppError()
+
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/components/ble/common"
+            "${SDK_ROOT}/components/softdevice/common"
+            "${SDK_ROOT}/components/libraries/strerror"
+            "${SDK_ROOT}/components/libraries/atomic"
+            )
+
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/components/libraries/util/app_util_platform.c"
+            "${SDK_ROOT}/components/libraries/experimental_section_vars/nrf_section_iter.c"
+            "${SDK_ROOT}/components/libraries/atomic/nrf_atomic.c"
+            "${SDK_ROOT}/components/softdevice/common/nrf_sdh_soc.c"
+            "${SDK_ROOT}/components/softdevice/common/nrf_sdh_ble.c"
+            "${SDK_ROOT}/components/softdevice/common/nrf_sdh.c"
+            "${SDK_ROOT}/components/ble/common/ble_conn_state.c"
+            "${SDK_ROOT}/components/ble/common/ble_conn_params.c"
+            "${SDK_ROOT}/components/ble/common/ble_advdata.c"
+            "${SDK_ROOT}/components/ble/common/ble_srv_common.c"
+            )
 endmacro()
 
 # adds Bluetooth Low Energy GATT support library
 macro(nRF5x_addBLEGATT)
-    include_directories(
-            "${NRF5_SDK_PATH}/components/ble/nrf_ble_gatt"
+    nRF5x_addSoftDeviceSupport()
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/components/ble/nrf_ble_gatt"
     )
 
-    list(APPEND SDK_SOURCE_FILES
-            "${NRF5_SDK_PATH}/components/ble/nrf_ble_gatt/nrf_ble_gatt.c"
-            )
-
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/components/ble/nrf_ble_gatt/nrf_ble_gatt.c"
+    )
 endmacro()
 
 # adds Bluetooth Low Energy advertising support library
 macro(nRF5x_addBLEAdvertising)
-    include_directories(
-            "${NRF5_SDK_PATH}/components/ble/ble_advertising"
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/components/ble/ble_advertising"
     )
 
-    list(APPEND SDK_SOURCE_FILES
-            "${NRF5_SDK_PATH}/components/ble/ble_advertising/ble_advertising.c"
-            )
-
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/components/ble/ble_advertising/ble_advertising.c"
+    )
 endmacro()
 
-# adds app-level FDS (flash data storage) library
-macro(nRF5x_addFDS)
-    if(NOT DEFINED nRF5x_FDS_ADDED)
-        set(nRF5x_FDS_ADDED TRUE)
-        include_directories(
-                "${NRF5_SDK_PATH}/components/libraries/fds"
-                "${NRF5_SDK_PATH}/components/libraries/fstorage"
-                "${NRF5_SDK_PATH}/components/libraries/experimental_section_vars"
-        )
+macro(nRF5x_addBLELinkCtxManager)
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/components/ble/ble_link_ctx_manager"
+    )
 
-        list(APPEND SDK_SOURCE_FILES
-                "${NRF5_SDK_PATH}/components/libraries/fds/fds.c"
-                "${NRF5_SDK_PATH}/components/libraries/fstorage/nrf_fstorage.c"
-                "${NRF5_SDK_PATH}/components/libraries/fstorage/nrf_fstorage_sd.c"
-                "${NRF5_SDK_PATH}/components/libraries/fstorage/nrf_fstorage_nvmc.c"
-                )
-    endif()
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/components/ble/ble_link_ctx_manager/ble_link_ctx_manager.c"
+    )
 endmacro()
 
 # adds Bluetooth Low Energy advertising support library
 macro(nRF5x_addBLEPeerManager)
     nRF5x_addFDS()
+    nRF5x_addAtomicFlags()
 
-    include_directories(
-            "${NRF5_SDK_PATH}/components/ble/peer_manager"
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/components/ble/peer_manager"
     )
 
-    list(APPEND SDK_SOURCE_FILES
-            "${NRF5_SDK_PATH}/components/ble/peer_manager/auth_status_tracker.c"
-            "${NRF5_SDK_PATH}/components/ble/peer_manager/gatt_cache_manager.c"
-            "${NRF5_SDK_PATH}/components/ble/peer_manager/gatts_cache_manager.c"
-            "${NRF5_SDK_PATH}/components/ble/peer_manager/id_manager.c"
-            "${NRF5_SDK_PATH}/components/ble/peer_manager/nrf_ble_lesc.c"
-            "${NRF5_SDK_PATH}/components/ble/peer_manager/peer_data_storage.c"
-            "${NRF5_SDK_PATH}/components/ble/peer_manager/peer_database.c"
-            "${NRF5_SDK_PATH}/components/ble/peer_manager/peer_id.c"
-            "${NRF5_SDK_PATH}/components/ble/peer_manager/peer_manager.c"
-            "${NRF5_SDK_PATH}/components/ble/peer_manager/peer_manager_handler.c"
-            "${NRF5_SDK_PATH}/components/ble/peer_manager/pm_buffer.c"
-            "${NRF5_SDK_PATH}/components/ble/peer_manager/security_dispatcher.c"
-            "${NRF5_SDK_PATH}/components/ble/peer_manager/security_manager.c"
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/components/ble/peer_manager/auth_status_tracker.c"
+            "${SDK_ROOT}/components/ble/peer_manager/gatt_cache_manager.c"
+            "${SDK_ROOT}/components/ble/peer_manager/gatts_cache_manager.c"
+            "${SDK_ROOT}/components/ble/peer_manager/id_manager.c"
+            "${SDK_ROOT}/components/ble/peer_manager/nrf_ble_lesc.c"
+            "${SDK_ROOT}/components/ble/peer_manager/peer_data_storage.c"
+            "${SDK_ROOT}/components/ble/peer_manager/peer_database.c"
+            "${SDK_ROOT}/components/ble/peer_manager/peer_id.c"
+            "${SDK_ROOT}/components/ble/peer_manager/peer_manager.c"
+            "${SDK_ROOT}/components/ble/peer_manager/peer_manager_handler.c"
+            "${SDK_ROOT}/components/ble/peer_manager/pm_buffer.c"
+            "${SDK_ROOT}/components/ble/peer_manager/security_dispatcher.c"
+            "${SDK_ROOT}/components/ble/peer_manager/security_manager.c"
     )
 
-endmacro()
-
-# adds aSAADC driver
-macro(nRF5x_addSAADC)
-    include_directories(
-    )
-
-    list(APPEND SDK_SOURCE_FILES
-            "${NRF5_SDK_PATH}/modules/nrfx/drivers/src/nrfx_saadc.c"
-            )
-endmacro()
-
-# adds PPI driver
-macro(nRF5x_addPPI)
-    include_directories(
-    )
-
-    list(APPEND SDK_SOURCE_FILES
-            "${NRF5_SDK_PATH}/modules/nrfx/drivers/src/nrfx_ppi.c"
-            )
-endmacro()
-
-# adds timer driver
-macro(nRF5x_addTimer)
-    include_directories(
-    )
-
-    list(APPEND SDK_SOURCE_FILES
-            "${NRF5_SDK_PATH}/modules/nrfx/drivers/src/nrfx_timer.c"
-            )
 endmacro()
 
 # adds NFC library
-# macro(nRF5x_addNFC)
-#     # NFC includes
-#     include_directories(
-#             "${NRF5_SDK_PATH}/components/nfc/ndef/conn_hand_parser"
-#             "${NRF5_SDK_PATH}/components/nfc/ndef/conn_hand_parser/ac_rec_parser"
-#             "${NRF5_SDK_PATH}/components/nfc/ndef/conn_hand_parser/ble_oob_advdata_parser"
-#             "${NRF5_SDK_PATH}/components/nfc/ndef/conn_hand_parser/le_oob_rec_parser"
-#             "${NRF5_SDK_PATH}/components/nfc/ndef/connection_handover/ac_rec"
-#             "${NRF5_SDK_PATH}/components/nfc/ndef/connection_handover/ble_oob_advdata"
-#             "${NRF5_SDK_PATH}/components/nfc/ndef/connection_handover/ble_pair_lib"
-#             "${NRF5_SDK_PATH}/components/nfc/ndef/connection_handover/ble_pair_msg"
-#             "${NRF5_SDK_PATH}/components/nfc/ndef/connection_handover/common"
-#             "${NRF5_SDK_PATH}/components/nfc/ndef/connection_handover/ep_oob_rec"
-#             "${NRF5_SDK_PATH}/components/nfc/ndef/connection_handover/hs_rec"
-#             "${NRF5_SDK_PATH}/components/nfc/ndef/connection_handover/le_oob_rec"
-#             "${NRF5_SDK_PATH}/components/nfc/ndef/generic/message"
-#             "${NRF5_SDK_PATH}/components/nfc/ndef/generic/record"
-#             "${NRF5_SDK_PATH}/components/nfc/ndef/launchapp"
-#             "${NRF5_SDK_PATH}/components/nfc/ndef/parser/message"
-#             "${NRF5_SDK_PATH}/components/nfc/ndef/parser/record"
-#             "${NRF5_SDK_PATH}/components/nfc/ndef/text"
-#             "${NRF5_SDK_PATH}/components/nfc/ndef/uri"
-#             "${NRF5_SDK_PATH}/components/nfc/t2t_lib"
-#             "${NRF5_SDK_PATH}/components/nfc/t2t_parser"
-#             "${NRF5_SDK_PATH}/components/nfc/t4t_lib"
-#             "${NRF5_SDK_PATH}/components/nfc/t4t_parser/apdu"
-#             "${NRF5_SDK_PATH}/components/nfc/t4t_parser/cc_file"
-#             "${NRF5_SDK_PATH}/components/nfc/t4t_parser/hl_detection_procedure"
-#             "${NRF5_SDK_PATH}/components/nfc/t4t_parser/tlv"
-#     )
-# 
-#     list(APPEND SDK_SOURCE_FILES
-#             "${NRF5_SDK_PATH}/components/nfc"
-#             )
-# 
-# endmacro()
-
-macro(nRF5x_addBLEService NAME)
-    include_directories(
-            "${NRF5_SDK_PATH}/components/ble/ble_services/${NAME}"
+macro(nRF5x_addNFC)
+    # NFC includes
+    list(APPEND INCLUDE_DIRS
+         "${SDK_ROOT}/components/nfc/ndef/conn_hand_parser"
+         "${SDK_ROOT}/components/nfc/ndef/conn_hand_parser/ac_rec_parser"
+         "${SDK_ROOT}/components/nfc/ndef/conn_hand_parser/ble_oob_advdata_parser"
+         "${SDK_ROOT}/components/nfc/ndef/conn_hand_parser/le_oob_rec_parser"
+         "${SDK_ROOT}/components/nfc/ndef/connection_handover/ac_rec"
+         "${SDK_ROOT}/components/nfc/ndef/connection_handover/ble_oob_advdata"
+         "${SDK_ROOT}/components/nfc/ndef/connection_handover/ble_pair_lib"
+         "${SDK_ROOT}/components/nfc/ndef/connection_handover/ble_pair_msg"
+         "${SDK_ROOT}/components/nfc/ndef/connection_handover/common"
+         "${SDK_ROOT}/components/nfc/ndef/connection_handover/ep_oob_rec"
+         "${SDK_ROOT}/components/nfc/ndef/connection_handover/hs_rec"
+         "${SDK_ROOT}/components/nfc/ndef/connection_handover/le_oob_rec"
+         "${SDK_ROOT}/components/nfc/ndef/generic/message"
+         "${SDK_ROOT}/components/nfc/ndef/generic/record"
+         "${SDK_ROOT}/components/nfc/ndef/launchapp"
+         "${SDK_ROOT}/components/nfc/ndef/parser/message"
+         "${SDK_ROOT}/components/nfc/ndef/parser/record"
+         "${SDK_ROOT}/components/nfc/ndef/text"
+         "${SDK_ROOT}/components/nfc/ndef/uri"
+         "${SDK_ROOT}/components/nfc/platform"
+         "${SDK_ROOT}/components/nfc/t2t_lib"
+         "${SDK_ROOT}/components/nfc/t2t_parser"
+         "${SDK_ROOT}/components/nfc/t4t_lib"
+         "${SDK_ROOT}/components/nfc/t4t_parser/apdu"
+         "${SDK_ROOT}/components/nfc/t4t_parser/cc_file"
+         "${SDK_ROOT}/components/nfc/t4t_parser/hl_detection_procedure"
+         "${SDK_ROOT}/components/nfc/t4t_parser/tlv"
     )
 
-    list(APPEND SDK_SOURCE_FILES
-            "${NRF5_SDK_PATH}/components/ble/ble_services/${NAME}/${NAME}.c"
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/components/nfc/ndef/conn_hand_parser/ac_rec_parser/nfc_ac_rec_parser.c"
+            "${SDK_ROOT}/components/nfc/ndef/conn_hand_parser/ble_oob_advdata_parser/nfc_ble_oob_advdata_parser.c"
+            "${SDK_ROOT}/components/nfc/ndef/conn_hand_parser/le_oob_rec_parser/nfc_le_oob_rec_parser.c"
+            "${SDK_ROOT}/components/nfc/ndef/connection_handover/ac_rec/nfc_ac_rec.c"
+            "${SDK_ROOT}/components/nfc/ndef/connection_handover/ble_oob_advdata/nfc_ble_oob_advdata.c"
+            "${SDK_ROOT}/components/nfc/ndef/connection_handover/ble_pair_lib/nfc_ble_pair_lib.c"
+            "${SDK_ROOT}/components/nfc/ndef/connection_handover/ble_pair_msg/nfc_ble_pair_msg.c"
+            "${SDK_ROOT}/components/nfc/ndef/connection_handover/common/nfc_common.c"
+            "${SDK_ROOT}/components/nfc/ndef/connection_handover/ep_oob_rec/nfc_ep_oob_rec.c"
+            "${SDK_ROOT}/components/nfc/ndef/connection_handover/hs_rec/nfc_hs_rec.c"
+            "${SDK_ROOT}/components/nfc/ndef/connection_handover/le_oob_rec/nfc_le_oob_rec.c"
+            "${SDK_ROOT}/components/nfc/ndef/generic/message/nfc_ndef_msg.c"
+            "${SDK_ROOT}/components/nfc/ndef/generic/record/nfc_ndef_record.c"
+            "${SDK_ROOT}/components/nfc/ndef/launchapp/nfc_launchapp_msg.c"
+            "${SDK_ROOT}/components/nfc/ndef/launchapp/nfc_launchapp_rec.c"
+            "${SDK_ROOT}/components/nfc/ndef/parser/message/nfc_ndef_msg_parser.c"
+            "${SDK_ROOT}/components/nfc/ndef/parser/message/nfc_ndef_msg_parser_local.c"
+            "${SDK_ROOT}/components/nfc/ndef/parser/record/nfc_ndef_record_parser.c"
+            "${SDK_ROOT}/components/nfc/ndef/text/nfc_text_rec.c"
+            "${SDK_ROOT}/components/nfc/ndef/uri/nfc_uri_msg.c"
+            "${SDK_ROOT}/components/nfc/ndef/uri/nfc_uri_rec.c"
+            "${SDK_ROOT}/components/nfc/platform/nfc_platform.c"
+            "${SDK_ROOT}/components/nfc/t2t_parser/nfc_t2t_parser.c"
+            "${SDK_ROOT}/components/nfc/t4t_parser/apdu/nfc_t4t_apdu.c"
+            "${SDK_ROOT}/components/nfc/t4t_parser/cc_file/nfc_t4t_cc_file.c"
+            "${SDK_ROOT}/components/nfc/t4t_parser/hl_detection_procedure/nfc_t4t_hl_detection_procedures.c"
+            "${SDK_ROOT}/components/nfc/t4t_parser/tlv/nfc_t4t_tlv_block.c"
+         )
+endmacro()
+
+macro(nRF5x_addBLEService NAME)
+    nRF5x_addBLEAdvertising()
+    nRF5x_addBLELinkCtxManager()
+    nRF5x_addBLEGATT()
+
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/components/ble/ble_services/${NAME}"
+    )
+
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/components/ble/ble_services/${NAME}/${NAME}.c"
             )
 
 endmacro()
