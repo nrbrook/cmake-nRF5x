@@ -90,6 +90,12 @@ endif ()
 # Export compilation commands to .json file (used by clang-complete backends)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Needed tools for generating documentation and serial PyACI
+find_package(PythonInterp)
+find_package(Doxygen)
+find_program(DOT_EXECUTABLE "dot" PATHS ENV PATH)
+find_program(MSCGEN_EXECUTABLE "mscgen" PATHS ENV PATH)
+
 if (NOT BUILD_HOST)
     include("${CMAKE_CONFIG_DIR}/Nrfjprog.cmake")
 endif ()
@@ -99,12 +105,6 @@ macro(nRF5x_setup)
         return()
     endif()
     set(nRF5x_setup_complete TRUE)
-
-    # Needed tools for generating documentation and serial PyACI
-    find_package(PythonInterp)
-    find_package(Doxygen)
-    find_program(DOT_EXECUTABLE "dot" PATHS ENV PATH)
-    find_program(MSCGEN_EXECUTABLE "mscgen" PATHS ENV PATH)
 
     include("${CMAKE_CONFIG_DIR}/Toolchain.cmake")
     include("${CMAKE_CONFIG_DIR}/Platform.cmake")
