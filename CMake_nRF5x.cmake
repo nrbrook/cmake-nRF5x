@@ -134,6 +134,8 @@ macro(nRF5x_setup)
 
     add_compile_options(${${ARCH}_DEFINES})
 
+    add_link_options(-u _printf_float)
+
     # adds target for erasing and flashing the board with a softdevice
     add_custom_target(FLASH_SOFTDEVICE ALL
             COMMAND ${NRFJPROG} --program ${${SOFTDEVICE}_HEX_FILE} -f nrf52 --sectorerase
