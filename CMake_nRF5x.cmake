@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.6)
+set(nRF5_SDK_VERSION "nRF5_SDK_15.3.0_59ac345" CACHE STRING "nRF5 SDK")
 
 # check if all the necessary tools paths have been provided.
 if (NOT SDK_ROOT)
@@ -17,6 +18,27 @@ if(NOT CMAKE_CONFIG_DIR)
     message(FATAL_ERROR "The path to the CMake config (CMAKE_CONFIG_DIR) must be set.")
 endif()
 
+# must be set in file (not macro) scope (in macro would point to parent CMake directory)
+set(DIR_OF_nRF5x_CMAKE ${CMAKE_CURRENT_LIST_DIR})
+
+find_program(PATCH_EXECUTABLE patch
+        DOC "Path to `patch` command line executable")
+
+set(MESH_PATCH_COMMAND "")
+if (PATCH_EXECUTABLE)
+    set(MESH_PATCH_FILE "${DIR_OF_nRF5x_CMAKE}/sdk/nrf5SDKforMeshv320src.patch")
+    if (EXISTS "${MESH_PATCH_FILE}")
+        set(MESH_PATCH_COMMAND patch -p1 -d ${CMAKE_CONFIG_DIR}/../ -i ${MESH_PATCH_FILE})
+    else ()
+        set(MESH_PATCH_COMMAND "")
+    endif()
+else ()
+    message(WARNING
+            "Could not find `patch` executable. \
+        Automatic patching of the nRF5 mesh SDK not supported. \
+        See ${PATCH_FILE} for diff to apply.")
+endif (PATCH_EXECUTABLE)
+
 macro(add_download_target name)
     if(TARGET download)
         add_dependencies(download ${name})
@@ -27,7 +49,6 @@ endmacro()
 
 if(NOT EXISTS ${SDK_ROOT}/license.txt)
     include(ExternalProject)
-    set(nRF5_SDK_VERSION "nRF5_SDK_15.3.0_59ac345" CACHE STRING "nRF5 SDK")
 
     string(REGEX REPLACE "(nRF5)([1]?_SDK_)([0-9]*).*" "\\1\\2v\\3.x.x" SDK_DIR ${nRF5_SDK_VERSION})
     set(nRF5_SDK_URL "https://developer.nordicsemi.com/nRF5_SDK/${SDK_DIR}/${nRF5_SDK_VERSION}.zip")
@@ -56,9 +77,10 @@ if(NOT EXISTS ${CMAKE_CONFIG_DIR}/Toolchain.cmake)
             PREFIX "nRF5_mesh_sdk"
             TMP_DIR "${CMAKE_CURRENT_BINARY_DIR}/nRF5_mesh_sdk"
             SOURCE_DIR "${CMAKE_CONFIG_DIR}/../"
-            DOWNLOAD_DIR "${CMAKE_CONFIG_DIR}/../zip"
+            DOWNLOAD_DIR "${CMAKE_CURRENT_BINARY_DIR}/nRF5_mesh_sdk/zip"
             DOWNLOAD_NAME "meshsdk.zip"
             URL ${nRF5_MESH_SDK_URL}
+            PATCH_COMMAND ${MESH_PATCH_COMMAND}
             # No build or configure commands
             CONFIGURE_COMMAND ""
             BUILD_COMMAND ""
@@ -72,9 +94,6 @@ if(TARGET download)
     message(WARNING "Run the 'download' target to download dependencies")
     return()
 endif()
-
-# must be set in file (not macro) scope (in macro would point to parent CMake directory)
-set(DIR_OF_nRF5x_CMAKE ${CMAKE_CURRENT_LIST_DIR})
 
 if (NOT BUILD_HOST)
     set(CMAKE_EXECUTABLE_SUFFIX ".elf")
