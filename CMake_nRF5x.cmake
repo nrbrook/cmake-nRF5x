@@ -14,6 +14,10 @@ if (NOT MERGEHEX)
     message(FATAL_ERROR "The path to the mergehex utility (MERGEHEX) must be set.")
 endif ()
 
+if (NOT NRFUTIL)
+    message(FATAL_ERROR "The path to the nrfutil utility (NRFUTIL) must be set.")
+endif ()
+
 if(NOT CMAKE_CONFIG_DIR)
     message(FATAL_ERROR "The path to the CMake config (CMAKE_CONFIG_DIR) must be set.")
 endif()
@@ -155,6 +159,8 @@ macro(nRF5x_setup)
 
     add_link_options(-u _printf_float)
 
+    include(${DIR_OF_nRF5x_CMAKE}/includes/secure_bootloader.cmake)
+
     # adds target for erasing and flashing the board with a softdevice
     add_custom_target(FLASH_SOFTDEVICE ALL
             COMMAND ${NRFJPROG} --program ${${SOFTDEVICE}_HEX_FILE} -f nrf52 --sectorerase
@@ -208,8 +214,20 @@ macro(nRF5x_addExecutable EXECUTABLE_NAME SOURCE_FILES INCLUDE_DIRECTORIES)
     create_hex(${EXECUTABLE_NAME})
     add_flash_target(${EXECUTABLE_NAME})
 
-#    get_property(target_include_dirs TARGET ${EXECUTABLE_NAME} PROPERTY INCLUDE_DIRECTORIES)
     add_ses_project(${EXECUTABLE_NAME})
+endmacro()
+
+macro(nRF5x_addBootloaderToTarget EXECUTABLE_NAME VERSION_STRING BOOTLOADER_VERSION PRIVATE_KEY)
+    if(NOT TARGET secure_bootloader)
+        message(FATAL_ERROR "You must call nRF5x_addSecureBootloader and provide the public key before calling nRF5x_addBootloaderToTarget")
+    endif()
+    add_custom_target(bl_merge_${EXECUTABLE_NAME} DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${EXECUTABLE_NAME}_bl_merged.hex)
+    add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${EXECUTABLE_NAME}_bl_merged.hex
+            COMMAND ${NRFUTIL} settings generate --family ${BL_OPT_FAMILY} --application ${CMAKE_CURRENT_BINARY_DIR}/${EXECUTABLE_NAME}.hex --application-version-string ${VERSION_STRING} --bootloader-version ${BOOTLOADER_VERSION} --bl-settings-version 2 --app-boot-validation VALIDATE_ECDSA_P256_SHA256 --sd-boot-validation VALIDATE_ECDSA_P256_SHA256 --key-file ${PRIVATE_KEY} --softdevice ${${SOFTDEVICE}_HEX_FILE} ${CMAKE_CURRENT_BINARY_DIR}/bootloader_setting.hex
+            COMMAND ${MERGEHEX} -m ${CMAKE_BINARY_DIR}/bootloader-build/bootloader.hex ${CMAKE_CURRENT_BINARY_DIR}/bootloader_setting.hex ${CMAKE_CURRENT_BINARY_DIR}/${EXECUTABLE_NAME}_merged.hex -o ${CMAKE_CURRENT_BINARY_DIR}/${EXECUTABLE_NAME}_bl_merged.hex
+            DEPENDS merge_${EXECUTABLE_NAME}
+            DEPENDS secure_bootloader
+            VERBATIM)
 endmacro()
 
 # adds mutex lib
