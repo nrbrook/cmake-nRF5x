@@ -388,6 +388,31 @@ macro(nRF5x_addFDS)
     )
 endmacro()
 
+# adds svc library
+macro(nRF5x_addSVC)
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/components/libraries/svc"
+            )
+
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/components/libraries/svc/nrf_svc_handler.c"
+            )
+endmacro()
+
+# adds dfu buttonless bootloader libs
+macro(nRF5x_addBootloaderButtonlessLibs)
+    nRF5x_addSVC()
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/components/libraries/bootloader"
+            "${SDK_ROOT}/components/libraries/bootloader/dfu"
+            "${SDK_ROOT}/components/libraries/bootloader/ble_dfu"
+            )
+
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/components/libraries/bootloader/nrf_bootloader_info.c"
+            )
+endmacro()
+
 # adds ring buffer library
 macro(nRF5x_addRingBuf)
     list(APPEND INCLUDE_DIRS
@@ -483,6 +508,28 @@ macro(nRF5x_addGPIOTE)
 
     list(APPEND SOURCE_FILES
             "${SDK_ROOT}/modules/nrfx/drivers/src/nrfx_gpiote.c"
+            )
+endmacro()
+
+# adds rtc driver
+macro(nRF5x_addRTC)
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/modules/nrfx/drivers/include"
+            )
+
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/modules/nrfx/drivers/src/nrfx_rtc.c"
+            )
+endmacro()
+
+# adds timer driver
+macro(nRF5x_addTimer)
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/modules/nrfx/drivers/include"
+            )
+
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/modules/nrfx/drivers/src/nrfx_timer.c"
             )
 endmacro()
 
@@ -736,4 +783,11 @@ macro(nRF5x_addBLEService NAME)
             "${SDK_ROOT}/components/ble/ble_services/${NAME}/${NAME}.c"
             )
 
+    if("${NAME}" STREQUAL "ble_dfu")
+        list(APPEND SOURCE_FILES
+                "${SDK_ROOT}/components/ble/ble_services/${NAME}/${NAME}_bonded.c"
+                "${SDK_ROOT}/components/ble/ble_services/${NAME}/${NAME}_unbonded.c"
+                )
+        nRF5x_addBootloaderButtonlessLibs()
+    endif()
 endmacro()
