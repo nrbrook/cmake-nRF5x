@@ -192,6 +192,13 @@ macro(nRF5x_setup)
 
 endmacro()
 
+function(nRF5x_addFlashTarget targetName hexFile)
+    add_custom_target(flash_${targetName}
+            COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CONFIG_DIR}/nrfjprog.py "${hexFile}"
+            USES_TERMINAL
+            DEPENDS ${targetName})
+endfunction()
+
 # adds a target for comiling and flashing an executable
 macro(nRF5x_addExecutable EXECUTABLE_NAME SOURCE_FILES INCLUDE_DIRECTORIES)
     list(REMOVE_DUPLICATES SOURCE_FILES)
