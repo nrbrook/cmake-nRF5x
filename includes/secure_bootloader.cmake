@@ -48,29 +48,26 @@ set(s212_6.1.1_FWID 0xBC)
 set(s332_6.1.1_FWID 0xBA)
 set(s340_6.1.1_FWID 0xB9)
 
-# add the secure bootloader target.
-# also sets BL_OPT_FAMILY, BL_OPT_SD_ID, BL_OPT_SD_REQ for use with nrfutil params
-macro(nRF5x_addSecureBootloader PUBLIC_KEY_C_PATH PREVIOUS_SOFTDEVICES)
-    if(TARGET secure_bootloader)
-        return()
-    endif()
-    if(NOT DEFINED ${IC}_FAMILY)
-        message(FATAL_ERROR "The family is not found for the IC ${IC}, define a valid IC or check secure_bootloader.cmake for missing IC defs")
-    endif()
-    set(BL_OPT_FAMILY ${${IC}_FAMILY})
-    message("-- IC: ${IC}")
-    message("-- Previous softdevices: ${PREVIOUS_SOFTDEVICES}")
+set(SECURE_BOOTLOADER_SRC_DIR "${SDK_ROOT}/examples/dfu/secure_bootloader/${BOARD}_ble/armgcc")
 
-    # set to hw version e.g. 52 for nrf52
-    string(SUBSTRING ${PLATFORM} 3 2 BL_OPT_HW_VERSION)
+if(NOT DEFINED ${IC}_FAMILY)
+    message(FATAL_ERROR "The family is not found for the IC ${IC}, define a valid IC or check secure_bootloader.cmake for missing IC defs")
+endif()
+set(BL_OPT_FAMILY ${${IC}_FAMILY})
+message("-- IC: ${IC}")
+message("-- Previous softdevices: ${PREVIOUS_SOFTDEVICES}")
 
-    if(NOT DEFINED ${SOFTDEVICE}_FWID)
-        message(FATAL_ERROR "The FWID is not found for the soft device ${SOFTDEVICE}, check secure_bootloader.cmake for missing softdevice defs")
-    endif()
-    set(BL_OPT_SD_ID ${${SOFTDEVICE}_FWID})
+# set to hw version e.g. 52 for nrf52
+string(SUBSTRING ${PLATFORM} 3 2 BL_OPT_HW_VERSION)
 
+if(NOT DEFINED ${SOFTDEVICE}_FWID)
+    message(FATAL_ERROR "The FWID is not found for the soft device ${SOFTDEVICE}, check secure_bootloader.cmake for missing softdevice defs")
+endif()
+set(BL_OPT_SD_ID ${${SOFTDEVICE}_FWID})
+
+macro(nRF5x_get_BL_OPT_SD_REQ PREVIOUS_SOFTDEVICES)
+    unset(BL_OPT_SD_REQ)
     set(ids_list ${BL_OPT_SD_ID})
-
     foreach(sd ${PREVIOUS_SOFTDEVICES})
         if(NOT DEFINED ${sd}_FWID)
             message(FATAL_ERROR "The FWID is not found for the previous soft device ${sd}, check secure_bootloader.cmake for missing softdevice defs")
@@ -80,24 +77,20 @@ macro(nRF5x_addSecureBootloader PUBLIC_KEY_C_PATH PREVIOUS_SOFTDEVICES)
     list(REMOVE_DUPLICATES ids_list)
 
     list(JOIN ids_list "," BL_OPT_SD_REQ)
-
-    set(SECURE_BOOTLOADER_SRC_DIR "${SDK_ROOT}/examples/dfu/secure_bootloader/${BOARD}_ble/armgcc")
-
-    include(ExternalProject)
-    ExternalProject_Add(secure_bootloader
-            DOWNLOAD_COMMAND ""
-            UPDATE_COMMAND ""
-            SOURCE_DIR        ${SECURE_BOOTLOADER_SRC_DIR}
-            BINARY_DIR        "${CMAKE_BINARY_DIR}/bootloader-build"
-            BUILD_COMMAND     $(MAKE) -C ${SECURE_BOOTLOADER_SRC_DIR} ${MAKEFILE_VARS}
-            CONFIGURE_COMMAND ""
-            INSTALL_COMMAND   ""
-            TEST_COMMAND      ""
-            )
-    add_custom_target(copyPublicKey COMMAND ${CMAKE_COMMAND} -E copy ${PUBLIC_KEY_C_PATH} ${SDK_ROOT}/examples/dfu/dfu_public_key.c)
-    add_dependencies(secure_bootloader uECC)
-    add_dependencies(secure_bootloader copyPublicKey)
-    add_custom_command(TARGET secure_bootloader POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy ${SECURE_BOOTLOADER_SRC_DIR}/_build/*.hex "${CMAKE_BINARY_DIR}/bootloader-build/bootloader.hex"
-            )
 endmacro()
+
+# add the secure bootloader target.
+# also sets BL_OPT_FAMILY, BL_OPT_SD_ID, BL_OPT_SD_REQ for use with nrfutil params
+function(nRF5x_addSecureBootloader EXECUTABLE_NAME PUBLIC_KEY_C_PATH BUILD_FLAGS)
+    set(OP_FILE "${CMAKE_CURRENT_BINARY_DIR}/${EXECUTABLE_NAME}_bootloader.hex")
+    add_custom_target(secure_bootloader_${EXECUTABLE_NAME} DEPENDS "${OP_FILE}")
+    add_custom_command(OUTPUT "${OP_FILE}"
+            COMMAND ${CMAKE_COMMAND} -E copy "${PUBLIC_KEY_C_PATH}" "${SDK_ROOT}/examples/dfu/dfu_public_key.c"
+            COMMAND $(MAKE) -C "${SECURE_BOOTLOADER_SRC_DIR}" ${MAKEFILE_VARS} ${BUILD_FLAGS}
+            COMMAND ${CMAKE_COMMAND} -E copy "${SECURE_BOOTLOADER_SRC_DIR}/_build/*.hex" "${OP_FILE}"
+            DEPENDS uECC
+            )
+    set_property(DIRECTORY APPEND PROPERTY ADDITIONAL_MAKE_CLEAN_FILES
+            "${SECURE_BOOTLOADER_SRC_DIR}/_build"
+            )
+endfunction()

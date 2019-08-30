@@ -217,18 +217,54 @@ macro(nRF5x_addExecutable EXECUTABLE_NAME SOURCE_FILES INCLUDE_DIRECTORIES)
     add_ses_project(${EXECUTABLE_NAME})
 endmacro()
 
-macro(nRF5x_addBootloaderToTarget EXECUTABLE_NAME VERSION_STRING BOOTLOADER_VERSION PRIVATE_KEY)
-    if(NOT TARGET secure_bootloader)
-        message(FATAL_ERROR "You must call nRF5x_addSecureBootloader and provide the public key before calling nRF5x_addBootloaderToTarget")
+function(nRF5x_addBootloaderMergeTarget EXECUTABLE_NAME VERSION_STRING PRIVATE_KEY PREVIOUS_SOFTDEVICES APP_VALIDATION SD_VALIDATION BOOTLOADER_VERSION)
+    if(NOT TARGET secure_bootloader_${EXECUTABLE_NAME})
+        message(FATAL_ERROR "You must call nRF5x_addSecureBootloader and provide the public key before calling nRF5x_addBootloaderMergeTarget")
     endif()
-    add_custom_target(bl_merge_${EXECUTABLE_NAME} DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${EXECUTABLE_NAME}_bl_merged.hex)
-    add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${EXECUTABLE_NAME}_bl_merged.hex
-            COMMAND ${NRFUTIL} settings generate --family ${BL_OPT_FAMILY} --application ${CMAKE_CURRENT_BINARY_DIR}/${EXECUTABLE_NAME}.hex --application-version-string ${VERSION_STRING} --bootloader-version ${BOOTLOADER_VERSION} --bl-settings-version 2 --app-boot-validation VALIDATE_ECDSA_P256_SHA256 --sd-boot-validation VALIDATE_ECDSA_P256_SHA256 --key-file ${PRIVATE_KEY} --softdevice ${${SOFTDEVICE}_HEX_FILE} ${CMAKE_CURRENT_BINARY_DIR}/bootloader_setting.hex
-            COMMAND ${MERGEHEX} -m ${CMAKE_BINARY_DIR}/bootloader-build/bootloader.hex ${CMAKE_CURRENT_BINARY_DIR}/bootloader_setting.hex ${CMAKE_CURRENT_BINARY_DIR}/${EXECUTABLE_NAME}_merged.hex -o ${CMAKE_CURRENT_BINARY_DIR}/${EXECUTABLE_NAME}_bl_merged.hex
-            DEPENDS merge_${EXECUTABLE_NAME}
-            DEPENDS secure_bootloader
+    nRF5x_get_BL_OPT_SD_REQ(${PREVIOUS_SOFTDEVICES})
+    set(OP_FILE "${CMAKE_CURRENT_BINARY_DIR}/${EXECUTABLE_NAME}_bl_merged.hex")
+    add_custom_target(bl_merge_${EXECUTABLE_NAME} DEPENDS "${OP_FILE}")
+    add_custom_command(OUTPUT "${OP_FILE}"
+            COMMAND ${NRFUTIL} settings generate --family ${BL_OPT_FAMILY} --application "${CMAKE_CURRENT_BINARY_DIR}/${EXECUTABLE_NAME}.hex" --application-version-string "${VERSION_STRING}" --app-boot-validation ${APP_VALIDATION} --bootloader-version ${BOOTLOADER_VERSION} --bl-settings-version 2 --softdevice "${${SOFTDEVICE}_HEX_FILE}" --sd-boot-validation ${SD_VALIDATION} --key-file "${PRIVATE_KEY}" "${CMAKE_CURRENT_BINARY_DIR}/${EXECUTABLE_NAME}_bootloader_setting.hex"
+            COMMAND ${MERGEHEX} -m "${CMAKE_CURRENT_BINARY_DIR}/${EXECUTABLE_NAME}_bootloader.hex" "${CMAKE_CURRENT_BINARY_DIR}/${EXECUTABLE_NAME}_bootloader_setting.hex" "${CMAKE_CURRENT_BINARY_DIR}/${EXECUTABLE_NAME}_merged.hex" -o "${OP_FILE}"
+            DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/${EXECUTABLE_NAME}_merged.hex"
+            DEPENDS secure_bootloader_${EXECUTABLE_NAME}
+            DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/${EXECUTABLE_NAME}_bootloader.hex"
             VERBATIM)
-endmacro()
+endfunction()
+
+function(_addDFUPackageTarget INCLUDE_BL_SD EXECUTABLE_NAME VERSION_STRING PRIVATE_KEY PREVIOUS_SOFTDEVICES APP_VALIDATION SD_VALIDATION BOOTLOADER_VERSION)
+    if(NOT TARGET secure_bootloader_${EXECUTABLE_NAME})
+        message(FATAL_ERROR "You must call nRF5x_addSecureBootloader and provide the public key before calling _nRF5x_addDFUPackageTarget")
+    endif()
+
+    nRF5x_get_BL_OPT_SD_REQ(${PREVIOUS_SOFTDEVICES})
+    set(PKG_OPT --sd-req ${BL_OPT_SD_REQ} --hw-version ${BL_OPT_HW_VERSION} --application "${CMAKE_CURRENT_BINARY_DIR}/${EXECUTABLE_NAME}.hex" --application-version-string "${VERSION_STRING}" --app-boot-validation ${APP_VALIDATION} --key-file "${PRIVATE_KEY}")
+    set(DEPENDS ${EXECUTABLE_NAME})
+    if(${INCLUDE_BL_SD})
+        list(APPEND PKG_OPT --sd-id ${BL_OPT_SD_ID} --bootloader "${CMAKE_CURRENT_BINARY_DIR}/${EXECUTABLE_NAME}_bootloader.hex" --bootloader-version ${BOOTLOADER_VERSION} --softdevice "${${SOFTDEVICE}_HEX_FILE}" --sd-boot-validation ${SD_VALIDATION})
+        list(APPEND DEPENDS secure_bootloader_${EXECUTABLE_NAME})
+        set(TARGET_PREFIX pkg_bl_sd_)
+        set(FILENAME_SUFFIX _bl_sd_app)
+    else()
+        set(TARGET_PREFIX pkg_)
+        set(FILENAME_SUFFIX _app)
+    endif()
+    set(OP_FILE "${CMAKE_CURRENT_BINARY_DIR}/${EXECUTABLE_NAME}${FILENAME_SUFFIX}.zip")
+    add_custom_target(${TARGET_PREFIX}${EXECUTABLE_NAME} DEPENDS "${OP_FILE}")
+    add_custom_command(OUTPUT "${OP_FILE}"
+            COMMAND ${NRFUTIL} pkg generate ${PKG_OPT} ${OP_FILE}
+            DEPENDS ${DEPENDS}
+            VERBATIM)
+endfunction()
+
+function(nRF5x_addDFU_BL_SD_APP_PkgTarget EXECUTABLE_NAME VERSION_STRING PRIVATE_KEY PREVIOUS_SOFTDEVICES APP_VALIDATION SD_VALIDATION BOOTLOADER_VERSION)
+    _addDFUPackageTarget(TRUE ${EXECUTABLE_NAME} ${VERSION_STRING} ${PRIVATE_KEY} ${PREVIOUS_SOFTDEVICES} ${APP_VALIDATION} ${SD_VALIDATION} ${BOOTLOADER_VERSION})
+endfunction()
+
+function(nRF5x_addDFU_APP_PkgTarget EXECUTABLE_NAME VERSION_STRING PRIVATE_KEY PREVIOUS_SOFTDEVICES APP_VALIDATION)
+    _addDFUPackageTarget(FALSE ${EXECUTABLE_NAME} ${VERSION_STRING} ${PRIVATE_KEY} ${PREVIOUS_SOFTDEVICES} ${APP_VALIDATION} "" "")
+endfunction()
 
 # adds mutex lib
 macro(nRF5x_addMutex)
