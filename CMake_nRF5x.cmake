@@ -399,6 +399,16 @@ macro(nRF5x_addSVC)
             )
 endmacro()
 
+macro(nRF5x_addCRC32)
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/components/libraries/crc32"
+            )
+
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/components/libraries/crc32/crc32.c"
+            )
+endmacro()
+
 # adds dfu buttonless bootloader libs
 macro(nRF5x_addBootloaderButtonlessLibs)
     nRF5x_addSVC()
@@ -410,6 +420,30 @@ macro(nRF5x_addBootloaderButtonlessLibs)
 
     list(APPEND SOURCE_FILES
             "${SDK_ROOT}/components/libraries/bootloader/nrf_bootloader_info.c"
+            "${SDK_ROOT}/components/libraries/bootloader/dfu/nrf_dfu_svci.c"
+            )
+endmacro()
+
+macro(nRF5x_addBootloaderSettings)
+    nRF5x_addCRC32()
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/components/libraries/bootloader/dfu"
+            )
+
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/components/libraries/bootloader/dfu/nrf_dfu_settings.c"
+            )
+endmacro()
+
+# adds hardfault handler library
+macro(nRF5x_addHardfaultHandler)
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/components/libraries/hardfault"
+            )
+
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/components/libraries/hardfault/hardfault_implementation.c"
+            "${SDK_ROOT}/components/libraries/hardfault/nrf52/handler/hardfault_handler_gcc.c"
             )
 endmacro()
 
