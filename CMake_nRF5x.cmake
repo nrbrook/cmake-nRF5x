@@ -273,6 +273,22 @@ function(nRF5x_addDFU_APP_PkgTarget EXECUTABLE_NAME VERSION_STRING PRIVATE_KEY P
     _addDFUPackageTarget(FALSE ${EXECUTABLE_NAME} ${VERSION_STRING} ${PRIVATE_KEY} ${PREVIOUS_SOFTDEVICES} ${APP_VALIDATION} "" "")
 endfunction()
 
+function(nRF5x_print_size EXECUTABLE_NAME include_softdevice include_bootloader)
+    set(target_depend ${EXECUTABLE_NAME})
+    set(options "")
+    if(${include_softdevice})
+        set(target_depend merge_${EXECUTABLE_NAME})
+        list(APPEND options -s "${CMAKE_CURRENT_SOURCE_DIR}/linker/${PLATFORM}_${SOFTDEVICE}.ld")
+    endif()
+    if(${include_bootloader})
+        set(target_depend bl_merge_${EXECUTABLE_NAME})
+        list(APPEND options -b "${CMAKE_CURRENT_BINARY_DIR}/${EXECUTABLE_NAME}_bootloader.out")
+    endif()
+    add_custom_command(TARGET ${target_depend} POST_BUILD
+            COMMAND ${DIR_OF_nRF5x_CMAKE}/includes/getSizes -r 65536 -l 524288 -f ${CMAKE_CURRENT_BINARY_DIR}/${EXECUTABLE_NAME}.elf ${options}
+            VERBATIM)
+endfunction()
+
 # adds mutex lib
 macro(nRF5x_addMutex)
     list(APPEND INCLUDE_DIRS

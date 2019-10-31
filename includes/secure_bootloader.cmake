@@ -82,12 +82,13 @@ endmacro()
 # add the secure bootloader target.
 # also sets BL_OPT_FAMILY, BL_OPT_SD_ID, BL_OPT_SD_REQ for use with nrfutil params
 function(nRF5x_addSecureBootloader EXECUTABLE_NAME PUBLIC_KEY_C_PATH BUILD_FLAGS)
-    set(OP_FILE "${CMAKE_CURRENT_BINARY_DIR}/${EXECUTABLE_NAME}_bootloader.hex")
-    add_custom_target(secure_bootloader_${EXECUTABLE_NAME} DEPENDS "${OP_FILE}")
-    add_custom_command(OUTPUT "${OP_FILE}"
+    set(OP_FILE "${CMAKE_CURRENT_BINARY_DIR}/${EXECUTABLE_NAME}_bootloader")
+    add_custom_target(secure_bootloader_${EXECUTABLE_NAME} DEPENDS "${OP_FILE}.hex")
+    add_custom_command(OUTPUT "${OP_FILE}.hex"
             COMMAND ${CMAKE_COMMAND} -E copy "${PUBLIC_KEY_C_PATH}" "${SDK_ROOT}/examples/dfu/dfu_public_key.c"
             COMMAND $(MAKE) -C "${SECURE_BOOTLOADER_SRC_DIR}" ${MAKEFILE_VARS} ${BUILD_FLAGS}
-            COMMAND ${CMAKE_COMMAND} -E copy "${SECURE_BOOTLOADER_SRC_DIR}/_build/*.hex" "${OP_FILE}"
+            COMMAND ${CMAKE_COMMAND} -E copy "${SECURE_BOOTLOADER_SRC_DIR}/_build/*.hex" "${OP_FILE}.hex"
+            COMMAND ${CMAKE_COMMAND} -E copy "${SECURE_BOOTLOADER_SRC_DIR}/_build/*.out" "${OP_FILE}.out"
             DEPENDS uECC
             )
     set_property(DIRECTORY APPEND PROPERTY ADDITIONAL_MAKE_CLEAN_FILES
