@@ -2,6 +2,28 @@
 
 cd "$( dirname "${BASH_SOURCE[0]}" )"
 
+function help() {
+    echo "Options:"
+    echo "usage: getSizes [-b <bootloader elf or out path>] [-s <linker script path>] "
+    echo "                [-f <firmware elf path>] [-r <max ram size>]"
+    echo "                [-l <max flash size>] [-h]"
+    echo ""
+    echo " -b : Include the flash and RAM consumption of the bootloader, passing the"
+    echo "      path to the bootloader elf or out file"
+    echo " -f : Include the flash and RAM consumption of the firmware, passing the path"
+    echo "      to the firmware elf file"
+    echo " -h : Display this help"
+    echo " -l : Define the max flash size, in bytes, for % consumption calculation"
+    echo " -r : Define the max RAM size, in bytes, for % consumption calculation"
+    echo " -s : Include the flash and RAM consumption of the SoftDevice, retrieved from"
+    echo "      comments in the linker script file"
+    exit 0
+}
+
+if [[ $# == 0 ]]; then
+    help
+fi
+
 while [[ $# > 0 ]]
 do
 key="$1"
@@ -40,10 +62,8 @@ case $key in
     shift # past value
     ;;
     -h|--help)
-    echo "Options:"
-    echo "getSizes [-b <bootloader elf or out path>] [-s <linker script path>] [-f <firmware elf path>]"
-    echo "         [-r <max ram size>] [-l <max flash size>]"
-    exit 0
+    help()
+    shift
     ;;
     *)
             # unknown option
