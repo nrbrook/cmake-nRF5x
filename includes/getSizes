@@ -62,8 +62,7 @@ case $key in
     shift # past value
     ;;
     -h|--help)
-    help()
-    shift
+    help
     ;;
     *)
             # unknown option
