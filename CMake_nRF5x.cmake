@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.6)
-set(nRF5_SDK_VERSION "nRF5_SDK_15.3.0_59ac345" CACHE STRING "nRF5 SDK")
+set(nRF5_SDK_VERSION "nRF5_SDK_16.0.0_98a08e2" CACHE STRING "nRF5 SDK")
 
 # check if all the necessary tools paths have been provided.
 if (NOT SDK_ROOT)

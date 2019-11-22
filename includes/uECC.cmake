@@ -12,13 +12,14 @@ string(SUBSTRING ${PLATFORM} 0 5 uECC_PREFIX)
 
 include(${CMAKE_CURRENT_LIST_DIR}/makefile_vars.cmake)
 
-set(uECC_PATH "${SDK_ROOT}/external/micro-ecc/${uECC_PREFIX}${${ARCH}_uECC}_armgcc/armgcc")
+set(uECC_ROOT "${SDK_ROOT}/external/micro-ecc")
+set(uECC_PATH "${uECC_ROOT}/${uECC_PREFIX}${${ARCH}_uECC}_armgcc/armgcc")
 set(uECC_OP_FILE "${uECC_PATH}/micro_ecc_lib_${uECC_PREFIX}.a")
 include(ExternalProject)
 ExternalProject_Add(uECC
     GIT_REPOSITORY    https://github.com/kmackay/micro-ecc
     GIT_TAG           master
-    SOURCE_DIR        "${SDK_ROOT}/external/micro-ecc/micro-ecc"
+    SOURCE_DIR        "${uECC_ROOT}/micro-ecc"
     BINARY_DIR        "${CMAKE_BINARY_DIR}/uecc-build"
     BUILD_COMMAND     $(MAKE) -C "${uECC_PATH}" ${MAKEFILE_VARS}
     CONFIGURE_COMMAND ""
