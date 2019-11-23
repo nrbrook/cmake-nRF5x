@@ -883,7 +883,6 @@ macro(nRF5x_addNFC)
 endmacro()
 
 macro(nRF5x_addBLEService NAME)
-    nRF5x_addSoftDeviceSupport()
     nRF5x_addBLEAdvertising()
     nRF5x_addBLELinkCtxManager()
     nRF5x_addBLEGATT()
