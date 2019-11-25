@@ -619,6 +619,17 @@ macro(nRF5x_addTimer)
             )
 endmacro()
 
+# adds nvmc HAL
+macro(nRF5x_addNVMC)
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/modules/nrfx/hal"
+            )
+
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/modules/nrfx/hal/nrf_nvmc.c"
+            )
+endmacro()
+
 # adds queue library
 macro(nRF5x_addQueue)
     list(APPEND INCLUDE_DIRS
