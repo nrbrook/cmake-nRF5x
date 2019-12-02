@@ -572,6 +572,42 @@ macro(nRF5x_addRTC)
             )
 endmacro()
 
+# adds peripheral resource sharing driver
+macro(nRF5x_addPRS)
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/modules/nrfx/drivers/src/prs"
+            )
+
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/modules/nrfx/drivers/src/prs/nrfx_prs.c"
+            )
+endmacro()
+
+# adds uart driver
+macro(nRF5x_addUART)
+    nRF5x_addPRS()
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/modules/nrfx/drivers/include"
+            )
+
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/modules/nrfx/drivers/src/nrfx_uart.c"
+            "${SDK_ROOT}/modules/nrfx/drivers/src/nrfx_uarte.c"
+            )
+endmacro()
+
+# adds legacy uart driver
+macro(nRF5x_addLegacyUART)
+    nRF5x_addUART()
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/integration/nrfx/legacy"
+            )
+
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/integration/nrfx/legacy/nrf_drv_uart.c"
+            )
+endmacro()
+
 # adds timer driver
 macro(nRF5x_addTimer)
     list(APPEND INCLUDE_DIRS
@@ -580,6 +616,43 @@ macro(nRF5x_addTimer)
 
     list(APPEND SOURCE_FILES
             "${SDK_ROOT}/modules/nrfx/drivers/src/nrfx_timer.c"
+            )
+endmacro()
+
+# adds nvmc HAL
+macro(nRF5x_addNVMC)
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/modules/nrfx/hal"
+            )
+
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/modules/nrfx/hal/nrf_nvmc.c"
+            )
+endmacro()
+
+# adds queue library
+macro(nRF5x_addQueue)
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/components/libraries/queue"
+            )
+
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/components/libraries/queue/nrf_queue.c"
+            )
+endmacro()
+
+# adds serial library
+macro(nRF5x_addSerial)
+    nRF5x_addLegacyUART()
+    nRF5x_addMutex()
+    nRF5x_addQueue()
+    nRF5x_addAppTimer()
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/components/libraries/serial"
+            )
+
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/components/libraries/serial/nrf_serial.c"
             )
 endmacro()
 
@@ -614,15 +687,14 @@ macro(nRF5x_addAppTimer)
             )
 endmacro()
 
-# adds app-level UART libraries
+# adds app UART library
 macro(nRF5x_addAppUART)
+    nRF5x_addLegacyUART()
     list(APPEND INCLUDE_DIRS
-            "${SDK_ROOT}/integration/nrfx/legacy"
             "${SDK_ROOT}/components/libraries/uart"
     )
 
     list(APPEND SOURCE_FILES
-            "${SDK_ROOT}/integration/nrfx/legacy/nrf_drv_uart.c"
             "${SDK_ROOT}/components/libraries/uart/app_uart_fifo.c"
             )
 
@@ -674,6 +746,7 @@ macro(nRF5x_addSoftDeviceSupport)
     nRF5x_addMemobj()
     nRF5x_addStrError()
     nRF5x_addAppError()
+    nRF5x_addAtomicFlags()
 
     list(APPEND INCLUDE_DIRS
             "${SDK_ROOT}/components/ble/common"
@@ -839,5 +912,6 @@ macro(nRF5x_addBLEService NAME)
                 "${SDK_ROOT}/components/ble/ble_services/${NAME}/${NAME}_unbonded.c"
                 )
         nRF5x_addBootloaderButtonlessLibs()
+        nRF5x_addBLEPeerManager()
     endif()
 endmacro()
