@@ -274,6 +274,18 @@ diff -Naur -x '*.DS_Store' -x '*.elf' -x '*.hex' -x '*.map' -x '*.o' -x '*.bin' 
 +    -DS140
 +    -DSOFTDEVICE_PRESENT
 +    -DNRF_SD_BLE_API_VERSION=${${name}_MAJOR_VERSION})
+diff -Naur -x '*.DS_Store' -x '*.elf' -x '*.hex' -x '*.map' -x '*.o' -x '*.bin' -x _build -x Output -x '*.emSession' nrf5SDKforMeshv320src.orig/CMake/toolchain/gccarmemb.cmake nrf5SDKforMeshv320src/CMake/toolchain/gccarmemb.cmake
+--- nrf5SDKforMeshv320src.orig/CMake/toolchain/gccarmemb.cmake	2019-07-26 14:13:36.000000000 +0100
++++ nrf5SDKforMeshv320src/CMake/toolchain/gccarmemb.cmake	2019-12-02 17:18:09.000000000 +0000
+@@ -44,7 +44,7 @@
+     add_custom_command(
+         TARGET ${executable}
+         POST_BUILD
+-        COMMAND arm-none-eabi-objcopy -O ihex ${CMAKE_CURRENT_BINARY_DIR}/${executable}.elf ${CMAKE_CURRENT_BINARY_DIR}/${executable}.hex
++        COMMAND arm-none-eabi-objcopy -R .rtt -O ihex ${CMAKE_CURRENT_BINARY_DIR}/${executable}.elf ${CMAKE_CURRENT_BINARY_DIR}/${executable}.hex
+         BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${executable}.hex)
+ 
+     add_custom_command(
 diff -Naur -x '*.DS_Store' -x '*.elf' -x '*.hex' -x '*.map' -x '*.o' -x '*.bin' -x _build -x Output -x '*.emSession' nrf5SDKforMeshv320src.orig/doc/getting_started/how_to_toolchain.md nrf5SDKforMeshv320src/doc/getting_started/how_to_toolchain.md
 --- nrf5SDKforMeshv320src.orig/doc/getting_started/how_to_toolchain.md	2019-07-26 14:13:34.000000000 +0100
 +++ nrf5SDKforMeshv320src/doc/getting_started/how_to_toolchain.md	2019-11-22 11:21:08.000000000 +0000
