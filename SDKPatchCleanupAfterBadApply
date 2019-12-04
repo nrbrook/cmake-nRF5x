@@ -1,5 +1,7 @@
 #!/bin/bash
 
+version="16.0.0_98a08e2"
+
 realpath() {
   OURPWD=$PWD
   cd "$(dirname "$1")"
@@ -17,6 +19,12 @@ root="$( realpath $(dirname "${BASH_SOURCE[0]}") )"
 
 cd "$root/../toolchains/nRF5"
 
-diff -Naur -x *.DS_Store -x *.elf -x *.hex -x *.map -x *.o -x *.bin -x _build -x Output -x *.emSession nrf5SDKforMeshv320src.orig nrf5SDKforMeshv320src > "$root/sdk/nrf5SDKforMeshv320src.patch"
+find nrf5SDKforMeshv320src '(' \
+    -name \*-baseline -o \
+    -name \*-merge -o \
+    -name \*-original -o \
+    -name \*.orig -o \
+    -name \*.rej \
+')' -delete
 
 echo "Done!"

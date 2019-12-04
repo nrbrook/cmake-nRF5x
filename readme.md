@@ -13,6 +13,13 @@ The script makes use of the following tools:
 
 # Setup
 
+To run download target
+```
+cmake -Bcmake-build -G "CodeBlocks - Unix Makefiles"
+cmake --build cmake-build/ --target download
+```
+
+
 1. Download this repo (or add as submodule) to the directory `cmake-nRF5x` in your project
 
 1. Search the SDK `example` directory for a `sdk_config.h`, `main.c` and a linker script (normally named `<project_name>_gcc_<chip familly>.ld`) that fits your chip and project needs.
