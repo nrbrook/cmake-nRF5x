@@ -8,6 +8,7 @@ endmacro()
 
 # adds app error library
 macro(nRF5x_addAppError)
+    nRF5x_addLog()
     list(APPEND INCLUDE_DIRS
             "${SDK_ROOT}/components/libraries/util"
             )
@@ -567,6 +568,7 @@ endmacro()
 
 # adds app-level Button library
 macro(nRF5x_addAppButton)
+    nRF5x_addGPIOTE()
     list(APPEND INCLUDE_DIRS
             "${SDK_ROOT}/components/libraries/button"
             )
@@ -584,6 +586,7 @@ macro(nRF5x_addBSP WITH_BLE_BTN WITH_ANT_BTN WITH_NFC)
             )
 
     list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/components/boards/boards.c"
             "${SDK_ROOT}/components/libraries/bsp/bsp.c"
             )
 
