@@ -11,7 +11,8 @@ set(NRF5_LINKER_SCRIPT ${NRF_PROJECT_DEVICE_PATH}/armgcc/${NRF_PROJECT_NAME}_gcc
 # List the softdevice versions previously used
 set(PREVIOUS_SOFTDEVICES "s132_6.1.1")
 # Set the location to the DFU private key
-set(PRIVATE_KEY ${CMAKE_CURRENT_SOURCE_DIR}/keys/dfu-private.key)
+set(PRIVATE_KEY ${CMAKE_CURRENT_SOURCE_DIR}/../keys/dfu_private.key)
+set(PUBLIC_KEY ${CMAKE_CURRENT_SOURCE_DIR}/../keys/dfu_public_key.c)
 # Set the App validation type. [NO_VALIDATION|VALIDATE_GENERATED_CRC|VALIDATE_GENERATED_SHA256|VALIDATE_ECDSA_P256_SHA256]
 set(APP_VALIDATION_TYPE NO_VALIDATION)
 # Set the Soft Device validation type. [NO_VALIDATION|VALIDATE_GENERATED_CRC|VALIDATE_GENERATED_SHA256|VALIDATE_ECDSA_P256_SHA256]
@@ -58,7 +59,7 @@ nRF5x_addExecutable(${target} "${SOURCE_FILES}" "${INCLUDE_DIRS}" "${NRF5_LINKER
 set(bootloader_vars "")
 
 # add the secure bootloader build target
-nRF5x_addSecureBootloader(${target} "${CMAKE_CURRENT_SOURCE_DIR}/../keys/dfu-public_key.c" "${bootloader_vars}")
+nRF5x_addSecureBootloader(${target} "${PUBLIC_KEY}" "${bootloader_vars}")
 # add the bootloader merge target
 nRF5x_addBootloaderMergeTarget(${target} ${DFU_VERSION_STRING} ${PRIVATE_KEY} ${PREVIOUS_SOFTDEVICES} ${APP_VALIDATION_TYPE} ${SD_VALIDATION_TYPE} ${BOOTLOADER_VERSION})
 # add the bootloader merged flash target
@@ -69,4 +70,4 @@ nRF5x_addDFU_BL_SD_APP_PkgTarget(${target} ${DFU_VERSION_STRING} ${PRIVATE_KEY} 
 nRF5x_addDFU_APP_PkgTarget(${target} ${DFU_VERSION_STRING} ${PRIVATE_KEY} ${PREVIOUS_SOFTDEVICES} ${APP_VALIDATION_TYPE})
 
 # print the size of consumed RAM and flash
-nRF5x_print_size(${target} TRUE TRUE)
+nRF5x_print_size(${target} ${NRF5_LINKER_SCRIPT} TRUE)
