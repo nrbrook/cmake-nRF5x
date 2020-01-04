@@ -76,3 +76,15 @@ diff -Naur -x '*.DS_Store' -x '*.elf' -x '*.hex' -x '*.map' -x '*.o' -x '*.bin' 
          BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${executable}.hex)
  
      add_custom_command(
+diff -Naur -x '*.DS_Store' -x '*.elf' -x '*.hex' -x '*.map' -x '*.o' -x '*.bin' -x _build -x Output -x '*.emSession' nrf5SDKforMeshv400src.orig/CMake/nrfjprog.py nrf5SDKforMeshv400src/CMake/nrfjprog.py
+--- nrf5SDKforMeshv400src.orig/CMake/nrfjprog.py	2019-12-03 10:51:14.000000000 +0000
++++ nrf5SDKforMeshv400src/CMake/nrfjprog.py	2020-01-04 18:10:50.000000000 +0000
+@@ -41,6 +41,8 @@
+ 
+ 
+ def select_devices(devices):
++    if len(devices) == 1:
++        return [devices[0]]
+     device_range = list(range(len(devices)))
+     number = None
+     while number is None:
