@@ -1,39 +1,72 @@
-cmake_minimum_required(VERSION 3.12)
-
-project(BlinkyExample C ASM)
-
-# define some variables just for this example to determine file locations
-set(NRF_PROJECT_NAME ble_app_blinky)
-set(NRF_BOARD pca10040)
-set(NRF_SOFTDEVICE s132)
-
 # define some convenience variables to point to example project directories
-set(NRF_PROJECT_PATH ${NRF5_SDK_PATH}/examples/ble_peripheral/${NRF_PROJECT_NAME})
-set(NRF_PROJECT_DEVICE_PATH ${NRF_PROJECT_PATH}/${NRF_BOARD}/${NRF_SOFTDEVICE})
+set(NRF_PROJECT_NAME ble_app_blinky)
+set(NRF_PROJECT_PATH ${SDK_ROOT}/examples/ble_peripheral/${NRF_PROJECT_NAME})
+set(NRF_PROJECT_DEVICE_PATH ${NRF_PROJECT_PATH}/${BOARD}/${SOFTDEVICE_TYPE})
 
-# you can specify the location of the linker script if desired instead of using a specific file name
-set(NRF5_LINKER_SCRIPT ${NRF_PROJECT_DEVICE_PATH}/armgcc/${NRF_PROJECT_NAME}_gcc_${NRF_TARGET}.ld)
+# you can specify the location of the linker script if desired instead of using a specific file name. Do not include .ld extension.
+string(SUBSTRING ${PLATFORM} 0 5 NRF_FAMILY)
+set(NRF5_LINKER_SCRIPT ${NRF_PROJECT_DEVICE_PATH}/armgcc/${NRF_PROJECT_NAME}_gcc_${NRF_FAMILY})
 
-nRF5x_setup()
+# DFU requirements
+# List the softdevice versions previously used
+set(PREVIOUS_SOFTDEVICES "s132_6.1.1")
+# Set the location to the DFU private key
+set(PRIVATE_KEY ${CMAKE_CURRENT_SOURCE_DIR}/keys/dfu-private.key)
+# Set the App validation type. [NO_VALIDATION|VALIDATE_GENERATED_CRC|VALIDATE_GENERATED_SHA256|VALIDATE_ECDSA_P256_SHA256]
+set(APP_VALIDATION_TYPE NO_VALIDATION)
+# Set the Soft Device validation type. [NO_VALIDATION|VALIDATE_GENERATED_CRC|VALIDATE_GENERATED_SHA256|VALIDATE_ECDSA_P256_SHA256]
+set(SD_VALIDATION_TYPE NO_VALIDATION)
+# The bootloader version (user defined)
+set(BOOTLOADER_VERSION 1)
+# The DFU version string (firmware version string)
+set(DFU_VERSION_STRING "${VERSION_STRING}")
 
+# Set the target name
+set(target BlinkyExample)
+
+# add the required libraries for this example
 nRF5x_addAppScheduler()
 nRF5x_addAppFIFO()
 nRF5x_addAppTimer()
 nRF5x_addAppUART()
 nRF5x_addAppButton()
+nRF5x_addPowerMgmt()
 nRF5x_addBSP(TRUE FALSE FALSE)
 nRF5x_addBLEGATT()
-
+nRF5x_addBLEQWR()
 nRF5x_addBLEService(ble_lbs)
 
-add_definitions(-DCONFIG_GPIO_AS_PINRESET)
-
 # usually you would include files in this directory here, like so:
-#include_directories(.)
-#list(APPEND SOURCE_FILES main.c)
+#list(APPEND SOURCE_FILES
+#        main.c
+#        )
+#list(APPEND INCLUDE_DIRS
+#        "${CMAKE_CURRENT_SOURCE_DIR}"
+#        )
 
 # for example projects we include the example source files
-include_directories(${NRF_PROJECT_DEVICE_PATH}/config)
-list(APPEND SOURCE_FILES ${NRF_PROJECT_PATH}/main.c)
+list(APPEND SOURCE_FILES
+        ${NRF_PROJECT_PATH}/main.c
+        )
+list(APPEND INCLUDE_DIRS
+        ${NRF_PROJECT_DEVICE_PATH}/config
+        )
 
-nRF5x_addExecutable(BlinkyExample "${SOURCE_FILES}")
+nRF5x_addExecutable(${target} "${SOURCE_FILES}" "${INCLUDE_DIRS}" "${NRF5_LINKER_SCRIPT}")
+
+# Here you would set a list of user variables to be defined for the bootloader makefile (which you have modified yourself)
+set(bootloader_vars "")
+
+# add the secure bootloader build target
+nRF5x_addSecureBootloader(${target} "${CMAKE_CURRENT_SOURCE_DIR}/../keys/dfu-public_key.c" "${bootloader_vars}")
+# add the bootloader merge target
+nRF5x_addBootloaderMergeTarget(${target} ${DFU_VERSION_STRING} ${PRIVATE_KEY} ${PREVIOUS_SOFTDEVICES} ${APP_VALIDATION_TYPE} ${SD_VALIDATION_TYPE} ${BOOTLOADER_VERSION})
+# add the bootloader merged flash target
+nRF5x_addFlashTarget(bl_merge_${target} "${CMAKE_CURRENT_BINARY_DIR}/${target}_bl_merged.hex")
+# Add the Bootloader + SoftDevice + App package target
+nRF5x_addDFU_BL_SD_APP_PkgTarget(${target} ${DFU_VERSION_STRING} ${PRIVATE_KEY} ${PREVIOUS_SOFTDEVICES} ${APP_VALIDATION_TYPE} ${SD_VALIDATION_TYPE} ${BOOTLOADER_VERSION})
+# Add the App package target
+nRF5x_addDFU_APP_PkgTarget(${target} ${DFU_VERSION_STRING} ${PRIVATE_KEY} ${PREVIOUS_SOFTDEVICES} ${APP_VALIDATION_TYPE})
+
+# print the size of consumed RAM and flash
+nRF5x_print_size(${target} TRUE TRUE)

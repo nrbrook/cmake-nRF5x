@@ -146,3 +146,4 @@ $RECYCLE.BIN/
 
 cmake-build-*
 .idea
+example/toolchains
