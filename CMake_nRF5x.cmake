@@ -214,20 +214,31 @@ function(nRF5x_addFlashTarget targetName hexFile)
 endfunction()
 
 # adds a target for comiling and flashing an executable
-macro(nRF5x_addExecutable EXECUTABLE_NAME SOURCE_FILES INCLUDE_DIRECTORIES)
-    list(REMOVE_DUPLICATES SOURCE_FILES)
-    list(REMOVE_DUPLICATES INCLUDE_DIRECTORIES)
+macro(nRF5x_addExecutable EXECUTABLE_NAME SOURCE_FILES INCLUDE_DIRECTORIES LINKER_FILE)
+    set(_SOURCE_FILES ${SOURCE_FILES})
+    set(_INCLUDE_DIRECTORIES ${INCLUDE_DIRECTORIES})
+    list(APPEND _SOURCE_FILES
+        "${${PLATFORM}_SOURCE_FILES}"
+        "${${nRF5_SDK_VERSION}_SOURCE_FILES}"
+    )
+    list(APPEND _INCLUDE_DIRECTORIES
+        "${${SOFTDEVICE}_INCLUDE_DIRS}"
+        "${${PLATFORM}_INCLUDE_DIRS}"
+        "${${BOARD}_INCLUDE_DIRS}"
+        "${${nRF5_SDK_VERSION}_INCLUDE_DIRS}"
+    )
 
-    add_executable(${EXECUTABLE_NAME} ${SOURCE_FILES})
+    list(REMOVE_DUPLICATES _SOURCE_FILES)
+    list(REMOVE_DUPLICATES _INCLUDE_DIRECTORIES)
 
-    target_include_directories(${EXECUTABLE_NAME} PUBLIC ${INCLUDE_DIRECTORIES})
+    add_executable(${EXECUTABLE_NAME} ${_SOURCE_FILES})
 
-    set_target_link_options(${EXECUTABLE_NAME}
-            ${CMAKE_CURRENT_SOURCE_DIR}/linker/${PLATFORM}_${SOFTDEVICE})
+    target_include_directories(${EXECUTABLE_NAME} PUBLIC ${_INCLUDE_DIRECTORIES})
+
+    set_target_link_options(${EXECUTABLE_NAME} "${LINKER_FILE}")
 
     target_compile_definitions(${EXECUTABLE_NAME} PUBLIC
             ${USER_DEFINITIONS}
-            -DUSE_APP_CONFIG
             ${${PLATFORM}_DEFINES}
             ${${SOFTDEVICE}_DEFINES}
             ${${BOARD}_DEFINES})
