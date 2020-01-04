@@ -46,6 +46,17 @@ macro(nRF5x_addBalloc)
 
 endmacro()
 
+# adds atomic library
+macro(nRF5x_addAtomic)
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/components/libraries/atomic/"
+            )
+
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/components/libraries/atomic/nrf_atomic.c"
+            )
+endmacro()
+
 # adds atomic fifo lib
 macro(nRF5x_addAtomicFIFO)
     list(APPEND INCLUDE_DIRS
@@ -60,6 +71,7 @@ endmacro()
 
 # adds atomic flags lib
 macro(nRF5x_addAtomicFlags)
+    nRF5x_addAtomic()
     list(APPEND INCLUDE_DIRS
             "${SDK_ROOT}/components/libraries/atomic_flags"
             )
@@ -331,6 +343,7 @@ endmacro()
 
 # adds ring buffer library
 macro(nRF5x_addRingBuf)
+    nRF5x_addAtomic()
     list(APPEND INCLUDE_DIRS
             "${SDK_ROOT}/components/libraries/ringbuf"
             )
@@ -364,6 +377,8 @@ endmacro()
 # adds log library
 macro(nRF5x_addLog)
     nRF5x_addRingBuf()
+    nRF5x_addMemobj()
+    nRF5x_addStrError()
 
     list(APPEND INCLUDE_DIRS
             "${SDK_ROOT}/external/fprintf"
@@ -619,14 +634,11 @@ macro(nRF5x_addSoftDeviceSupport)
     list(APPEND INCLUDE_DIRS
             "${SDK_ROOT}/components/ble/common"
             "${SDK_ROOT}/components/softdevice/common"
-            "${SDK_ROOT}/components/libraries/strerror"
-            "${SDK_ROOT}/components/libraries/atomic"
             )
 
     list(APPEND SOURCE_FILES
             "${SDK_ROOT}/components/libraries/util/app_util_platform.c"
             "${SDK_ROOT}/components/libraries/experimental_section_vars/nrf_section_iter.c"
-            "${SDK_ROOT}/components/libraries/atomic/nrf_atomic.c"
             "${SDK_ROOT}/components/softdevice/common/nrf_sdh_soc.c"
             "${SDK_ROOT}/components/softdevice/common/nrf_sdh_ble.c"
             "${SDK_ROOT}/components/softdevice/common/nrf_sdh.c"
