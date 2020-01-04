@@ -52,14 +52,13 @@ set(s212_6.1.1_FWID 0xBC)
 set(s332_6.1.1_FWID 0xBA)
 set(s340_6.1.1_FWID 0xB9)
 
-string(SUBSTRING ${SOFTDEVICE} 0 4 SOFTDEVICE_TYPE)
-
 set(SECURE_BOOTLOADER_SRC_DIR "${SDK_ROOT}/examples/dfu/secure_bootloader/${BOARD}_${SOFTDEVICE_TYPE}_ble/armgcc")
 
 if(NOT DEFINED ${IC}_FAMILY)
     message(FATAL_ERROR "The family is not found for the IC ${IC}, define a valid IC or check secure_bootloader.cmake for missing IC defs")
 endif()
 set(BL_OPT_FAMILY ${${IC}_FAMILY})
+
 message("-- IC: ${IC}")
 message("-- Previous softdevices: ${PREVIOUS_SOFTDEVICES}")
 

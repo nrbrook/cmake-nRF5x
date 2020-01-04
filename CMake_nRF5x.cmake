@@ -22,6 +22,18 @@ if(NOT CMAKE_CONFIG_DIR)
     message(FATAL_ERROR "The path to the CMake config (CMAKE_CONFIG_DIR) must be set.")
 endif()
 
+if(NOT IC)
+    message(FATAL_ERROR "The chip (IC) must be set, e.g. \"nrf52832\"")
+endif()
+
+if(NOT SOFTDEVICE_TYPE)
+    message(FATAL_ERROR "The softdevice type (SOFTDEVICE_TYPE) must be set, e.g. \"s132\"")
+endif()
+if(NOT SOFTDEVICE_VERSION)
+    message(FATAL_ERROR "The softdevice version (SOFTDEVICE_VERSION) must be set, e.g. \"7.0.1\"")
+endif()
+set(SOFTDEVICE "${SOFTDEVICE_TYPE}_${SOFTDEVICE_VERSION}" CACHE STRING "${IC} SoftDevice")
+
 # must be set in file (not macro) scope (in macro would point to parent CMake directory)
 set(DIR_OF_nRF5x_CMAKE ${CMAKE_CURRENT_LIST_DIR})
 
