@@ -21,7 +21,7 @@ set(SOFTDEVICE_TYPE "s132" CACHE STRING "SoftDevice type")
 set(SOFTDEVICE_VERSION "7.0.1" CACHE STRING "SoftDevice version")
 
 # Paths to modify
-set(CMAKE_CONFIG_DIR "${CMAKE_SOURCE_DIR}/toolchains/nRF5/nrf5SDKforMeshv320src/CMake")
+set(CMAKE_CONFIG_DIR "${CMAKE_SOURCE_DIR}/toolchains/nRF5/nrf5SDKforMeshv400src/CMake")
 set(SDK_ROOT "${CMAKE_SOURCE_DIR}/toolchains/nRF5/nRF5_SDK_16.0.0_98a08e2")
 find_program(NRFJPROG nrfjprog)
 find_program(MERGEHEX mergehex)

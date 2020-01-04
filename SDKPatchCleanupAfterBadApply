@@ -1,7 +1,5 @@
 #!/bin/bash
 
-version="16.0.0_98a08e2"
-
 realpath() {
   OURPWD=$PWD
   cd "$(dirname "$1")"
@@ -19,7 +17,7 @@ root="$( realpath $(dirname "${BASH_SOURCE[0]}") )"
 
 cd "$root/../toolchains/nRF5"
 
-find nrf5SDKforMeshv320src '(' \
+find nrf5SDKforMeshv400src '(' \
     -name \*-baseline -o \
     -name \*-merge -o \
     -name \*-original -o \

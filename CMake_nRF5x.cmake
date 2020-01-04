@@ -44,7 +44,7 @@ find_program(PATCH_EXECUTABLE patch
 
 set(MESH_PATCH_COMMAND "")
 if (PATCH_EXECUTABLE)
-    set(MESH_PATCH_FILE "${DIR_OF_nRF5x_CMAKE}/sdk/nrf5SDKforMeshv320src.patch")
+    set(MESH_PATCH_FILE "${DIR_OF_nRF5x_CMAKE}/sdk/nrf5SDKforMeshv400src.patch")
     if (EXISTS "${MESH_PATCH_FILE}")
         set(MESH_PATCH_COMMAND patch -p1 -d ${CMAKE_CONFIG_DIR}/../ -i ${MESH_PATCH_FILE})
     else ()
@@ -89,7 +89,7 @@ endif()
 
 if(NOT EXISTS ${CMAKE_CONFIG_DIR}/Toolchain.cmake)
     include(ExternalProject)
-    set(nRF5_MESH_SDK_URL "https://www.nordicsemi.com/-/media/Software-and-other-downloads/SDKs/nRF5-SDK-for-Mesh/nrf5SDKforMeshv320src.zip")
+    set(nRF5_MESH_SDK_URL "https://www.nordicsemi.com/-/media/Software-and-other-downloads/SDKs/nRF5-SDK-for-Mesh/nrf5SDKforMeshv400src.zip")
 
     ExternalProject_Add(nRF5_MESH_SDK
             PREFIX "nRF5_mesh_sdk"
