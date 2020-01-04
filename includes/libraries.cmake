@@ -660,6 +660,17 @@ macro(nRF5x_addBLEAdvertising)
             )
 endmacro()
 
+# adds Bluetooth Low Energy Queued Write library
+macro(nRF5x_addBLEQWR)
+    list(APPEND INCLUDE_DIRS
+            "${SDK_ROOT}/components/ble/nrf_ble_qwr"
+            )
+
+    list(APPEND SOURCE_FILES
+            "${SDK_ROOT}/components/ble/nrf_ble_qwr/nrf_ble_qwr.c"
+            )
+endmacro()
+
 macro(nRF5x_addBLELinkCtxManager)
     list(APPEND INCLUDE_DIRS
             "${SDK_ROOT}/components/ble/ble_link_ctx_manager"
