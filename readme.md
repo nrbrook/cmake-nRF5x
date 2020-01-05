@@ -36,6 +36,8 @@ This will download the dependencies and then re-run cmake ready for building
 
 ## Creating your own project
 
+_Note_: You can also follow the tutorial on the [NRB Tech blog](hhttps://nrbtech.io/blog/2020/1/4/using-cmake-for-nordic-nrf52-projects).
+
 1. Download this repo (or add as submodule) to the directory `cmake-nRF5x` in your project
 
 1. It is recommended that you copy the example `CMakeLists.txt` and `src/CMakeLists.txt` into your project, but you can inspect these and change the structure or copy as you need
@@ -48,62 +50,61 @@ This will download the dependencies and then re-run cmake ready for building
 
 1. Adjust the example `CMakeList.txt` files for your requirements, and to point at your source files
 
-_Note_: By default, C and assembly languages are enabled. You can add C++ with `enable_language(C ASM)`
+    _Note_: By default, C and assembly languages are enabled. You can add C++ with `enable_language(C ASM)`
 	
 1. Optionally add additional libraries:
 
-Many drivers and libraries are wrapped with macros, but if you need to add one that isn't already defined please create a pull request on `includes/libraries.cmake`
+    Many drivers and libraries are wrapped with macros to include them in your project, see `includes/libraries.cmake`. If you need one isn't implemented, please create an issue or pull request. 
 
-To include BLE services, use `nRF5x_addBLEService(<service name>)`.
+    To include BLE services, use `nRF5x_addBLEService(<service name>)`.
 
 # Build
 
 After setup you can use cmake as usual:
 
-1. Generate the actual build files (out-of-source builds are strongly recomended):
+1. Generate the build files:
 
 	```commandline
-	cmake -H. -B"cmake-build" -G "Unix Makefiles"
+	cmake -Bcmake-build-debug -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Debug
 	```
 
 2. Build your app:
 
 	```commandline
-	cmake --build "cmake-build" --target <your project name>
+	cmake --build cmake-build-debug --target <your target name>
 	```
+
+There are also other targets available:
+
+- `merge_<your target name>`: Builds the application and merges the SoftDevice
+- `secure_bootloader_<your target name>`: Builds the secure bootloader for this target
+- `uECC`: Builds the uECC library
+- `bl_merge_<your target name>`: Builds your application and the secure bootloader, merges these and the softdevice
+- `pkg_<your target name>`: Builds and packages your application for DFU
+- `pkg_bl_sd_<your target name>`: Builds and packages your application, the SoftDevice, and bootloader for DFU.
+
 
 # Flash
 
-In addition to the build target (named like your project) the script adds some support targets:
+In addition to the build targets the script adds some support targets:
 
-`FLASH_SOFTDEVICE` To flash a nRF softdevice to the SoC (typically done only once for each SoC)
-
-```commandline
-cmake --build "cmake-build" --target FLASH_SOFTDEVICE
-```
-
-`FLASH_<your project name>` To flash your application (this will also rebuild your App first)
-
-```commandline
-cmake --build "cmake-build" --target FLASH_<your project name>
-```
-
-`FLASH_ERASE` To completely erase the SoC flash
-
-```commandline
-cmake --build "cmake-build" --target FLASH_ERASE
-```
+- `FLASH_SOFTDEVICE`: Flashes the nRF softdevice to the SoC (typically done only once for each SoC if not using DFU flash target)
+- `flash_<your target name>`: Builds and flashes your application
+- `flash_bl_merge_<your target name>`: Builds the bootloader and application, and flashes both and the softdevice
+- `FLASH_ERASE`: Erases the SoC flash
 
 # JLink Applications
 
-To start the gdb server and RTT terminal, build the target `START_JLINK`:
+To start the gdb server and RTT terminal, build the target `START_JLINK_ALL`:
 
 ```commandline
-cmake --build "cmake-build" --target START_JLINK
+cmake --build "cmake-build" --target START_JLINK_ALL
 ```
+
+There are also the targets `START_JLINK_RTT` and `START_JLINK_GDBSERVER` to start these independently.
 
 # License
 
 MIT for the `CMake_nRF5x.cmake` file. 
 
-Please note that the nRF5x SDK by Nordic Semiconductor is covered by it's own license and shouldn't be re-distributed. 
+Please note that the nRF5x SDK and mesh SDK by Nordic Semiconductor are covered by their own licenses and shouldn't be re-distributed. 

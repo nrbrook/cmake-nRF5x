@@ -196,12 +196,22 @@ macro(nRF5x_setup)
         set(TERMINAL "gnome-terminal")
     endif()
 
-    add_custom_target(START_JLINK ALL
+    add_custom_target(START_JLINK_ALL ALL
             COMMAND ${TERMINAL} "${DIR_OF_nRF5x_CMAKE}/runJLinkGDBServer"
             COMMAND ${TERMINAL} "${DIR_OF_nRF5x_CMAKE}/runJLinkExe"
             COMMAND sleep 2s
             COMMAND ${TERMINAL} "${DIR_OF_nRF5x_CMAKE}/runJLinkRTTClient"
             COMMENT "started JLink commands"
+            )
+    add_custom_target(START_JLINK_RTT ALL
+            COMMAND ${TERMINAL} "${DIR_OF_nRF5x_CMAKE}/runJLinkExe"
+            COMMAND sleep 2s
+            COMMAND ${TERMINAL} "${DIR_OF_nRF5x_CMAKE}/runJLinkRTTClient"
+            COMMENT "started JLink RTT terminal"
+            )
+    add_custom_target(START_JLINK_GDBSERVER ALL
+            COMMAND ${TERMINAL} "${DIR_OF_nRF5x_CMAKE}/runJLinkGDBServer"
+            COMMENT "started JLink GDB server"
             )
 
 endmacro()
