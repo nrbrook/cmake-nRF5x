@@ -15,7 +15,7 @@ The script depends on the following external dependencies:
 - [Nordic command line tools](https://www.nordicsemi.com/Software-and-tools/Development-Tools/nRF-Command-Line-Tools/Download#infotabs) (`nrfjprog` and `mergehex`) by Nordic Semiconductor - Wrapper utility around JLink
 - [Nordic nrfutil](https://infocenter.nordicsemi.com/index.jsp?topic=%2Fug_nrfutil%2FUG%2Fnrfutil%2Fnrfutil_intro.html) by Nordic Semiconductor - a utility for generating DFU packages. Currently requires installing with `pip install nrfutil --pre` to install the prerelease 6.0.0 version.  
 - [ARM GNU Toolchain](https://developer.arm.com/tools-and-software/open-source-software/developer-tools/gnu-toolchain/gnu-rm/downloads) by ARM and the GCC Team - compiler toolchain for embedded (= bare metal) ARM chips. On a Mac, can be installed with homebrew:
-    ```commandline
+    ```shell
     brew tap ArmMbed/homebrew-formulae
     brew install arm-none-eabi-gcc
     ```
@@ -26,7 +26,7 @@ The script depends on the nRF5 SDK, and the nRF5 mesh SDK. It can download these
 
 After setting up your CMakeLists.txt as described below, or using the example project, to download the dependencies run:
 
-```
+```shell
 cmake -Bcmake-build-download -G "Unix Makefiles"
 cmake --build cmake-build-download/ --target download
 cmake -Bcmake-build-debug -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Debug
@@ -64,13 +64,13 @@ After setup you can use cmake as usual:
 
 1. Generate the build files:
 
-	```commandline
+	```shell
 	cmake -Bcmake-build-debug -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Debug
 	```
 
 2. Build your app:
 
-	```commandline
+	```shell
 	cmake --build cmake-build-debug --target <your target name>
 	```
 
@@ -97,7 +97,7 @@ In addition to the build targets the script adds some support targets:
 
 To start the gdb server and RTT terminal, build the target `START_JLINK_ALL`:
 
-```commandline
+```shell
 cmake --build "cmake-build" --target START_JLINK_ALL
 ```
 
