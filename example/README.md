@@ -1,3 +1,10 @@
 # Example
 
-This is an example to build the blinky project. It assumes nRF5 SDK is in `../../toolchains/nRF5/nRF5_SDK`. If not, modify `CMakeLists.txt` 
+This is an example to build the blinky project. To test, run:
+
+```
+cmake -Bcmake-build-download -G "Unix Makefiles"
+cmake --build cmake-build-download/ --target download
+cmake -Bcmake-build-debug -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Debug
+cmake --build cmake-build-debug/ --target flash_BlinkyExample 
+```
